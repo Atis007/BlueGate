@@ -1,0 +1,50 @@
+# python
+__pycache__/
+*.pyc
+
+# ----- PYTHON -----
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+*.egg-info/
+.eggs/
+*.log
+
+# PyInstaller
+build/
+dist/
+
+# ----- ENV VARIABLES -----
+.env
+.env.*
+
+# ----- RASPBERRY PI SPECIFIC -----
+*.swp
+*.swo
+*.bak
+*.tmp
+*.pid
+nohup.out
+
+# Systemd service build artifacts
+*.service
+
+# ----- LOGS -----
+logs/
+*.log
+*.out
+*.err
+*.tmp
+
+# ----- VS CODE -----
+.vscode/
+.history/
+*.code-workspace
+
+# ----- OS GARBAGE -----
+.DS_Store
+Thumbs.db
+desktop.ini
+
