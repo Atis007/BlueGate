@@ -15,7 +15,12 @@ module.exports = {
         },
       },
       fontFamily: {
-        display: ["Manrope_400Regular", "Manrope_500Medium", "Manrope_700Bold", "Manrope_800ExtraBold"],
+        display: [
+          "Manrope_400Regular",
+          "Manrope_500Medium",
+          "Manrope_700Bold",
+          "Manrope_800ExtraBold",
+        ],
       },
     },
   },
