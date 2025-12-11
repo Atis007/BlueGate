@@ -113,6 +113,32 @@ export default function Broadcast() {
             />
             <Text className="text-primary text-xs font-medium">Kezdőlap</Text>
           </TouchableOpacity>
+          <View className="h-16" />
+
+          {/* Bluetooth ID Section */}
+          <View className="w-full max-w-sm items-center">
+            <Text className="text-primary/70 text-sm font-normal pb-1 pt-1">
+              Bluetooth ID
+            </Text>
+            <View className="flex-row items-center justify-center gap-3">
+              <Text className="text-text-light text-4xl font-bold">
+                DUMMY-MAC-CIM
+              </Text>
+              <TouchableOpacity>
+                <Text className="text-2xl">{/* Copy jel helye */}</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Connect Button */}
+            <View className="mt-8">
+              <TouchableOpacity className="flex-row items-center justify-center gap-2 rounded-full bg-primary/20 px-6 py-3">
+                <Text className="text-xl">{/* Bluethoot jel helye */}</Text>
+                <Text className="text-lg font-bold text-primary">
+                  Csatlakozás
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </View>
     </SafeAreaView>
