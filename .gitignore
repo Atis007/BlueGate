@@ -1,27 +1,55 @@
-# python
+# ================================================================
+#                      NODE / JAVASCRIPT
+# ================================================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+yarn.lock
+.pnpm-store/
+.cache/
+dist/
+build/
+.next/
+expo/
+.expo/
+.expo-shared/
+
+# Metro bundler & RN build cache
+.expo/
+.expo-shared/
+.expo-next/
+.expo/*
+.expo-shared/*
+.expo-next/*
+
+# React Native iOS / Android
+android/
+ios/
+*.keystore
+*.jks
+
+# ================================================================
+#                        PYTHON / RASPBERRY PI
+# ================================================================
 __pycache__/
 *.pyc
-.venv/
-
-# ----- PYTHON -----
-__pycache__/
-*.py[cod]
 *.pyo
 *.pyd
 *.pdb
+*.py[cod]
 *.egg-info/
 .eggs/
-*.log
-
-# PyInstaller
+.venv/
+venv/
+env/
+ENV/
 build/
 dist/
 
-# ----- ENV VARIABLES -----
-.env
-.env.*
-
-# ----- RASPBERRY PI SPECIFIC -----
+# Pi specific / temp files
 *.swp
 *.swo
 *.bak
@@ -29,23 +57,41 @@ dist/
 *.pid
 nohup.out
 
-# Systemd service build artifacts
-*.service
+# ================================================================
+#                       ENVIRONMENT VARIABLES
+# ================================================================
+.env
+.env.*
+*.env.local
+*.env.production
+*.env.development
 
-# ----- LOGS -----
+# ================================================================
+#                             LOGS
+# ================================================================
 logs/
 *.log
 *.out
 *.err
 *.tmp
 
-# ----- VS CODE -----
+# ================================================================
+#                           VS CODE
+# ================================================================
 .vscode/
 .history/
 *.code-workspace
 
-# ----- OS GARBAGE -----
+# ================================================================
+#                            OS GARBAGE
+# ================================================================
 .DS_Store
 Thumbs.db
 desktop.ini
 
+# ================================================================
+#                           GIT CLEANUP
+# ================================================================
+.gitignore_global
+*.orig
+*.rej

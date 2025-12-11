@@ -1,43 +1,50 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+# python
+__pycache__/
+*.pyc
+.venv/
 
-# dependencies
-node_modules/
+# ----- PYTHON -----
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+*.egg-info/
+.eggs/
+*.log
 
-# Expo
-.expo/
+# PyInstaller
+build/
 dist/
-web-build/
-expo-env.d.ts
 
-# Native
-.kotlin/
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
+# ----- ENV VARIABLES -----
+.env
+.env.*
 
-# Metro
-.metro-health-check*
+# ----- RASPBERRY PI SPECIFIC -----
+*.swp
+*.swo
+*.bak
+*.tmp
+*.pid
+nohup.out
 
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
+# Systemd service build artifacts
+*.service
 
-# macOS
+# ----- LOGS -----
+logs/
+*.log
+*.out
+*.err
+*.tmp
+
+# ----- VS CODE -----
+.vscode/
+.history/
+*.code-workspace
+
+# ----- OS GARBAGE -----
 .DS_Store
-*.pem
-
-# local env files
-.env*.local
-
-# typescript
-*.tsbuildinfo
-
-app-example
-
-# generated native folders
-/ios
-/android
+Thumbs.db
+desktop.ini
