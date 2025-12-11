@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { hash } from 'bcryptjs';
 import { supabase } from '../lib/supabase';
 import './AddStudent.css';
 
@@ -46,13 +47,16 @@ export default function AddStudent() {
     setIsSubmitting(true);
 
     try {
+      // Hash the password before storing
+      const hashedPassword = await hash(formData.jelszo, 10);
+
       const { error } = await supabase
         .from('diak')
         .insert([
           {
             nev: formData.nev,
             indexszam: formData.indexszam,
-            jelszo: formData.jelszo,
+            jelszo: hashedPassword,
           }
         ])
         .select();

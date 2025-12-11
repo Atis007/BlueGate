@@ -31,6 +31,12 @@
   font-size: 0.9rem;
 }
 
+.user-role {
+  color: var(--accent);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
 .logout-link {
   background: none;
   border: none;

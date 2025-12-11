@@ -16,7 +16,7 @@ type AuthStatus = 'loading' | 'ready' | 'error'
 
 type Role = 'admin' | 'teacher'
 
-type AdminProfile = {
+type UserProfile = {
   id: number
   name: string
   email: string
@@ -30,14 +30,21 @@ type AdminRow = {
   jelszo: string
 }
 
+type TeacherRow = {
+  id: number
+  nev: string | null
+  email: string
+  jelszo: string
+}
+
 type AuthContextValue = {
   session: Session | null
   status: AuthStatus
   error: string | null
   supabaseClient: SupabaseClient | null
-  adminProfile: AdminProfile | null
+  userProfile: UserProfile | null
   signOut: () => Promise<void>
-  signInWithAdmin: (credentials: { email: string; password: string }) => Promise<{ ok: boolean; message?: string }>
+  signIn: (credentials: { email: string; password: string }) => Promise<{ ok: boolean; message?: string }>
 }
 
 const ADMIN_SESSION_KEY = 'bluegate-admin-profile'
@@ -49,10 +56,10 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(
     supabase ? null : 'A Supabase környezeti változók nincsenek beállítva.',
   )
-  const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(() => {
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
     if (typeof window === 'undefined') return null
     const stored = window.localStorage.getItem(ADMIN_SESSION_KEY)
-    return stored ? (JSON.parse(stored) as AdminProfile) : null
+    return stored ? (JSON.parse(stored) as UserProfile) : null
   })
 
   useEffect(() => {
@@ -95,15 +102,15 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    if (adminProfile) {
-      window.localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(adminProfile))
+    if (userProfile) {
+      window.localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(userProfile))
     } else {
       window.localStorage.removeItem(ADMIN_SESSION_KEY)
     }
-  }, [adminProfile])
+  }, [userProfile])
 
   const signOut = useCallback(async () => {
-    setAdminProfile(null)
+    setUserProfile(null)
     if (supabase) {
       const { error: signOutError } = await supabase.auth.signOut()
       if (signOutError) {
@@ -112,7 +119,7 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const signInWithAdmin = useCallback<AuthContextValue['signInWithAdmin']>(
+  const signIn = useCallback<AuthContextValue['signIn']>(
     async ({ email, password }) => {
       if (!supabase) {
         const message = 'A Supabase kliens nincs konfigurálva.'
@@ -125,24 +132,67 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
 
       const normalizedEmail = email.trim().toLowerCase()
 
-      const { data, error: queryError } = await supabase
+      // First, try to find in admin table
+      const { data: adminData, error: adminQueryError } = await supabase
         .from('admin')
         .select('id, nev, email, jelszo')
         .ilike('email', normalizedEmail)
         .maybeSingle<AdminRow>()
 
-      if (queryError) {
-        console.error('Admin login query error', queryError)
-        setStatus('ready')
-        return { ok: false, message: queryError.message }
+      if (adminQueryError) {
+        console.error('Admin login query error', adminQueryError)
       }
 
-      if (!data) {
+      // If found in admin table
+      if (adminData) {
+        const storedPassword = adminData.jelszo ?? ''
+        const isBcryptHash = storedPassword.startsWith('$2')
+        const passwordMatches = isBcryptHash
+          ? await compare(password, storedPassword)
+          : storedPassword === password
+
+        if (!isBcryptHash) {
+          console.warn(
+            'Biztonsági figyelmeztetés: az admin tábla jelszava nincs bcrypt-tel titkosítva. Javasolt a hash-elt tárolás.',
+          )
+        }
+
+        if (!passwordMatches) {
+          setStatus('ready')
+          return { ok: false, message: 'Hibás jelszó.' }
+        }
+
+        const profile: UserProfile = {
+          id: adminData.id,
+          name: adminData.nev ?? 'Admin',
+          email: adminData.email,
+          role: 'admin',
+        }
+
+        setUserProfile(profile)
+        setStatus('ready')
+        return { ok: true }
+      }
+
+      // If not found in admin, try teacher table
+      const { data: teacherData, error: teacherQueryError } = await supabase
+        .from('teacher')
+        .select('id, nev, email, jelszo')
+        .ilike('email', normalizedEmail)
+        .maybeSingle<TeacherRow>()
+
+      if (teacherQueryError) {
+        console.error('Teacher login query error', teacherQueryError)
+        setStatus('ready')
+        return { ok: false, message: teacherQueryError.message }
+      }
+
+      if (!teacherData) {
         setStatus('ready')
         return { ok: false, message: 'Ismeretlen felhasználó vagy hibás jogosultsági beállítás.' }
       }
 
-      const storedPassword = data.jelszo ?? ''
+      const storedPassword = teacherData.jelszo ?? ''
       const isBcryptHash = storedPassword.startsWith('$2')
       const passwordMatches = isBcryptHash
         ? await compare(password, storedPassword)
@@ -150,7 +200,7 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
 
       if (!isBcryptHash) {
         console.warn(
-          'Biztonsági figyelmeztetés: az admin tábla jelszava nincs bcrypt-tel titkosítva. Javasolt a hash-elt tárolás.',
+          'Biztonsági figyelmeztetés: a teacher tábla jelszava nincs bcrypt-tel titkosítva. Javasolt a hash-elt tárolás.',
         )
       }
 
@@ -159,14 +209,14 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
         return { ok: false, message: 'Hibás jelszó.' }
       }
 
-      const profile: AdminProfile = {
-        id: data.id,
-        name: data.nev ?? 'Admin',
-        email: data.email,
-        role: 'admin',
+      const profile: UserProfile = {
+        id: teacherData.id,
+        name: teacherData.nev ?? 'Tanár',
+        email: teacherData.email,
+        role: 'teacher',
       }
 
-      setAdminProfile(profile)
+      setUserProfile(profile)
       setStatus('ready')
 
       return { ok: true }
@@ -180,11 +230,11 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       status,
       error,
       supabaseClient: supabase,
-      adminProfile,
+      userProfile,
       signOut,
-      signInWithAdmin,
+      signIn,
     }),
-    [session, status, error, adminProfile, signInWithAdmin, signOut],
+    [session, status, error, userProfile, signIn, signOut],
   )
 
   return createElement(AuthContext.Provider, { value }, children)
