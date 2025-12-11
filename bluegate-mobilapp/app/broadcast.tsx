@@ -113,6 +113,7 @@ export default function Broadcast() {
             />
             <Text className="text-primary text-xs font-medium">Kezdőlap</Text>
           </TouchableOpacity>
+<<<<<<< HEAD
           <View className="h-16" />
 
           {/* Bluetooth ID Section */}
@@ -139,6 +140,8 @@ export default function Broadcast() {
               </TouchableOpacity>
             </View>
           </View>
+=======
+>>>>>>> 9910a1ecc608c2504ed22d14f2093bc3d040599e
         </View>
       </View>
     </SafeAreaView>
