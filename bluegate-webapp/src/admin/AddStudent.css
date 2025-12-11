@@ -1,0 +1,256 @@
+.add-student-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem 3rem;
+  background-color: #0a1929;
+  min-height: 100vh;
+}
+
+.add-student-header {
+  margin-bottom: 2.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.back-button {
+  background: rgba(0, 217, 255, 0.1);
+  border: 1px solid rgba(0, 217, 255, 0.2);
+  color: #00d9ff;
+  cursor: pointer;
+  padding: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  transition: all 0.3s ease;
+}
+
+.back-button:hover {
+  background-color: rgba(0, 217, 255, 0.2);
+  border-color: #00d9ff;
+  transform: translateX(-3px);
+}
+
+.add-student-header h1 {
+  font-size: 2rem;
+  font-weight: 500;
+  color: #ffffff;
+  margin: 0;
+  flex: 1;
+  letter-spacing: 0.5px;
+}
+
+.student-form {
+  background-color: #132f4c;
+  border: 1px solid #1e3a52;
+  border-radius: 16px;
+  padding: 2.5rem;
+}
+
+.form-group {
+  margin-bottom: 2rem;
+}
+
+.form-group label {
+  display: block;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #90caf9;
+  margin-bottom: 0.75rem;
+  letter-spacing: 0.3px;
+}
+
+.required {
+  color: #ff5252;
+}
+
+.form-group input,
+.form-group textarea {
+  width: 100%;
+  padding: 1rem 1.25rem;
+  font-size: 1rem;
+  border: 1px solid #1e3a52;
+  border-radius: 10px;
+  background-color: #0a1929;
+  color: #ffffff;
+  transition: all 0.3s ease;
+  font-family: inherit;
+}
+
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+  color: #546e7a;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #00d9ff;
+  background-color: #132f4c;
+  box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.1);
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.input-error {
+  border-color: #ff5252 !important;
+  box-shadow: 0 0 0 3px rgba(255, 82, 82, 0.1) !important;
+}
+
+.error-text {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #ff5252;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+}
+
+.error-text::before {
+  content: '⚠';
+  font-size: 1rem;
+}
+
+.password-input-wrapper {
+  position: relative;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 217, 255, 0.1);
+  border: 1px solid rgba(0, 217, 255, 0.2);
+  color: #00d9ff;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.password-toggle:hover {
+  background: rgba(0, 217, 255, 0.2);
+  border-color: #00d9ff;
+}
+
+.button-group {
+  margin-top: 3rem;
+  padding-bottom: 1rem;
+}
+
+.submit-button {
+  width: 100%;
+  padding: 1.125rem;
+  background: linear-gradient(135deg, #00d9ff 0%, #00b8d4 100%);
+  color: #0a1929;
+  border: none;
+  border-radius: 10px;
+  font-size: 1.125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 217, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.submit-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 217, 255, 0.4);
+}
+
+.submit-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.submit-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.cancel-button {
+  display: none;
+}
+
+@media (max-width: 992px) {
+  .add-student-container {
+    padding: 1.5rem 2rem;
+  }
+
+  .add-student-header h1 {
+    font-size: 1.75rem;
+  }
+
+  .student-form {
+    padding: 2rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .add-student-container {
+    padding: 1rem;
+  }
+
+  .add-student-header {
+    margin-bottom: 2rem;
+  }
+
+  .add-student-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .student-form {
+    padding: 1.5rem;
+  }
+
+  .form-group {
+    margin-bottom: 1.5rem;
+  }
+
+  .form-group input,
+  .form-group textarea {
+    padding: 0.875rem 1rem;
+  }
+
+  .button-group {
+    margin-top: 2rem;
+  }
+
+  .submit-button {
+    padding: 1rem;
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .add-student-header h1 {
+    font-size: 1.25rem;
+  }
+
+  .student-form {
+    padding: 1.25rem;
+  }
+}
