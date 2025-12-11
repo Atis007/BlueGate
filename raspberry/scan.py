@@ -17,6 +17,9 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     print("Nincs SUPABASE_URL vagy SUPABASE_SERVICE_KEY beállítva a .env fájlban!")
     sys.exit(1)
 
+seen = set()
+found_students = 0
+
 # Ellenőrzi a student_id formátumát
 def is_valid_student_id(student_id):
     """
@@ -88,68 +91,89 @@ def extract_student_id(advertisement_data):
     if not service_data:
         return None
 
-    # Ha nincs a mi Service UUID-ünk → nem a mobilapp
+    # Ha nem a mi Service UUID-ünk → skip
     if APP_SERVICE_UUID not in service_data:
         return None
-
-    raw = service_data[APP_SERVICE_UUID]
-
+    
     try:
-        return raw.decode("utf-8")
-    except (UnicodeDecodeError, AttributeError):
+        return service_data[APP_SERVICE_UUID].decode("utf-8")
+    except Exception:
         return None
+
+def detection_callback(device, advertisement_data):
+    """
+    EZ FUT LE MINDEN EGYES BLE HIRDETÉS ESEMÉNYNÉL.
+
+    Ez az új módszer → Raspberry Pi-n ez 100%-ban működik,
+    mert NEM discover()-t használunk, hanem BlueZ event stream-et.
+    """
+
+    global seen, found_students
+
+    rssi = getattr(advertisement_data, 'rssi', None)
+    if rssi is None:
+        return
+    
+    print(f"[DETEKTÁLT] MAC={device.address} RSSI={rssi}")
+
+    # Ha már feldolgoztuk ezt a MAC address-t → skip
+    if device.address in seen:
+        return
+    seen.add(device.address)
+
+    # Student ID kinyerése Service Data-ból
+    student_id = extract_student_id(advertisement_data)
+    if not student_id:
+        print("  → Nem app UUID, kihagyva.\n")
+        return
+
+    print(f"[APP UUID] ServiceData student_id='{student_id}'")
+
+    # 1) Formátum ellenőrzés
+    if not is_valid_student_id(student_id):
+        print("  → Hibás formátum, kihagyva.")
+        return
+
+    # 2) Diák létezik-e?
+    if not student_exists(student_id):
+        print("  → Nem létező diák Supabase-ben.")
+        return
+
+    # 3) RSSI szűrés
+    if rssi < RSSI_THRESHOLD:
+        print(f"  → Gyenge jel ({rssi} dBm), kihagyva.")
+        return
+
+    found_students += 1
+    
+    print(f"[OK] Felismert diák: {student_id} | RSSI={rssi} dBm")
+
+    # 4) Mentés Supabase-be
+    # insert_attendance(student_id, rssi)  # teszt alatt kikommentelve
 
 # BLE scan egyszeri futtatása
 async def scan_once():
     print("Indul a BLE scanner…")
     print("OS:", platform.system())
-    print(f"Scan idotartama: {SCAN_INTERVAL} mp\n")
+    print(f"Scan időtartama: {SCAN_INTERVAL} mp\n")
 
-    print("\nSearching for BLE devices...\n")
+    scanner = BleakScanner(detection_callback)
 
-    devices = await BleakScanner.discover(timeout=SCAN_INTERVAL)
+    print("Scanning... (BleakScanner callback módszer, Raspberry Pi kompatibilis)\n")
 
-    print("\nScan befejezve, feldolgozás...\n")
+    await scanner.start()
+    await asyncio.sleep(SCAN_INTERVAL)
+    await scanner.stop()
 
-    for dev in devices:
-        ad = None
-        # Windows → dev.details
-        if hasattr(dev, "details") and dev.details:
-            ad = getattr(dev.details, "advertisement_data", None)
+    print("\n-----------------------------")
+    print("Scan sikeresen lefutott.")
 
-        # Linux → dev.metadata
-        if not ad and hasattr(dev, "metadata"):
-            ad = dev.metadata.get("advertisement_data")
-        
-        # Ha továbbra sincs advertisement_data → skip
-        if not ad:
-            continue
+    if found_students == 0:
+        print("Nem találtunk app-UUID-val rendelkező eszközt.")
+    else:
+        print(f"Összesen {found_students} diákot ismertünk fel és dolgoztunk fel.")
 
-        student_id = extract_student_id(ad)
-        if not student_id:
-            continue  # más eszköz, nem a mobilapp
-
-        # Student ID formátum ellenőrzése
-        if not is_valid_student_id(student_id):
-            print(f"Formátum hibás → {student_id}")
-            continue
-
-        # Student létezik-e Supabase-ben?
-        if not student_exists(student_id):
-            print(f"Nincs ilyen diák Supabase-ben → {student_id}")
-            continue
-
-        rssi = dev.rssi
-        if rssi is None or rssi < RSSI_THRESHOLD:
-            print(f"Gyenge jel → student={student_id}, RSSI={rssi} dBm")
-            continue
-
-        print(f"Felismert diák: {student_id} | RSSI={rssi} dBm | MAC={dev.address}")
-
-        # Mentés Supabase-be
-        # insert_attendance(student_id, rssi) # Ezt most kikommenteztem teszteléshez
-
-    print("\nScan véget ért → Program leáll.")
+    print("-----------------------------\n")
     sys.exit(0)
 
 
