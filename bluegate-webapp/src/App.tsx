@@ -1,22 +1,24 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import type { ChangeEvent, FormEvent, ReactNode } from 'react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './App.css'
 import Students from './admin/Students'
 import AddStudent from './admin/AddStudent'
 import EditStudent from './admin/EditStudent'
+import TeacherDashboard from './teacher/Dashboard'
 import { SupabaseAuthProvider, useSupabaseSession } from './hooks/useSupabaseSession'
 
 function Header() {
-  const { adminProfile, signOut } = useSupabaseSession()
+  const { userProfile, signOut } = useSupabaseSession()
 
-  if (!adminProfile) {
+  if (!userProfile) {
     return null
   }
 
   return (
     <header className="app-header">
-      <span className="user-email">{adminProfile.email}</span>
+      <span className="user-email">{userProfile.email}</span>
+      <span className="user-role">({userProfile.role === 'admin' ? 'Admin' : 'Tanár'})</span>
       <button type="button" onClick={signOut} className="logout-link">
         Kijelentkezés
       </button>
@@ -24,23 +26,52 @@ function Header() {
   )
 }
 
-function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { adminProfile, status } = useSupabaseSession()
+type AllowedRoles = 'admin' | 'teacher' | 'all'
+
+function ProtectedRoute({ children, allowedRoles = 'all' }: { children: ReactNode; allowedRoles?: AllowedRoles }) {
+  const { userProfile, status } = useSupabaseSession()
   const location = useLocation()
 
   if (status === 'loading') {
     return <div className="loading-screen">Kapcsolódás az autentikációhoz…</div>
   }
 
-  if (!adminProfile) {
+  if (!userProfile) {
     return <Navigate to="/bejelentkezes" replace state={{ from: location.pathname }} />
+  }
+
+  // Check role-based access
+  if (allowedRoles !== 'all' && userProfile.role !== allowedRoles) {
+    return <Navigate to="/unauthorized" replace />
   }
 
   return <>{children}</>
 }
 
+function UnauthorizedPage() {
+  const navigate = useNavigate()
+  const { userProfile } = useSupabaseSession()
+
+  return (
+    <div className="login-shell">
+      <div>
+        <p className="hero-eyebrow">BlueGate</p>
+        <h1>Hozzáférés megtagadva</h1>
+        <p className="hero-subtitle">Nincs jogosultságod ehhez az oldalhoz.</p>
+      </div>
+      <button 
+        type="button" 
+        className="ghost-button"
+        onClick={() => navigate(userProfile?.role === 'admin' ? '/admin/students' : '/teacher/dashboard')}
+      >
+        Vissza a főoldalra
+      </button>
+    </div>
+  )
+}
+
 function LoginPage() {
-  const { adminProfile, status, error, signOut, signInWithAdmin } = useSupabaseSession()
+  const { userProfile, status, error, signOut, signIn } = useSupabaseSession()
   const navigate = useNavigate()
   const [formState, setFormState] = useState({ email: '', password: '' })
   const [formError, setFormError] = useState<string | null>(null)
@@ -56,26 +87,35 @@ function LoginPage() {
     setIsSubmitting(true)
     setFormError(null)
 
-    const result = await signInWithAdmin({ email: formState.email, password: formState.password })
+    const result = await signIn({ email: formState.email, password: formState.password })
 
     if (!result.ok) {
       setFormError(result.message ?? 'Sikertelen bejelentkezés.')
       setIsSubmitting(false)
-    } else {
-      navigate('/admin/students')
     }
   }
 
+  // Redirect after successful login based on role
+  useEffect(() => {
+    if (userProfile) {
+      if (userProfile.role === 'admin') {
+        navigate('/admin/students')
+      } else if (userProfile.role === 'teacher') {
+        navigate('/teacher/dashboard')
+      }
+    }
+  }, [userProfile, navigate])
+
   const isReady = status === 'ready'
   const showDisabledState = !isReady || isSubmitting
-  const isLoggedIn = Boolean(adminProfile)
+  const isLoggedIn = Boolean(userProfile)
 
   return (
     <div className="login-shell">
       <div>
-        <p className="hero-eyebrow">BlueGate Admin</p>
+        <p className="hero-eyebrow">BlueGate</p>
         <h1>Bejelentkezés</h1>
-        <p className="hero-subtitle">Írd be az admin tábla adatait, hogy elérd a felületet.</p>
+        <p className="hero-subtitle">Írd be az adataidat, hogy elérd a felületet.</p>
       </div>
 
       {error && <p className="alert alert-error">{error}</p>}
@@ -84,9 +124,9 @@ function LoginPage() {
       {isLoggedIn ? (
         <div className="login-success">
           <p>
-            Bejelentkezve mint <strong>{adminProfile?.name ?? adminProfile?.email}</strong>
+            Bejelentkezve mint <strong>{userProfile?.name ?? userProfile?.email}</strong>
           </p>
-          <p className="helper-text">Jogosultság: {adminProfile?.role ?? 'admin'}</p>
+          <p className="helper-text">Jogosultság: {userProfile?.role === 'admin' ? 'Admin' : 'Tanár'}</p>
           <button type="button" onClick={signOut} className="ghost-button">
             Kijelentkezés
           </button>
@@ -98,7 +138,7 @@ function LoginPage() {
             <input
               type="email"
               name="email"
-              placeholder="admin@bluegate"
+              placeholder="pelda@bluegate"
               autoComplete="username"
               value={formState.email}
               onChange={handleInputChange}
@@ -137,9 +177,19 @@ function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/bejelentkezes" replace />} />
           <Route path="/bejelentkezes" element={<LoginPage />} />
-          <Route path="/admin/students" element={<ProtectedRoute><Students /></ProtectedRoute>} />
-          <Route path="/admin/add-student" element={<ProtectedRoute><AddStudent /></ProtectedRoute>} />
-          <Route path="/admin/edit-student/:id" element={<ProtectedRoute><EditStudent /></ProtectedRoute>} />
+          <Route path="/unauthorized" element={<UnauthorizedPage />} />
+          
+          {/* Admin only routes */}
+          <Route path="/admin/students" element={<ProtectedRoute allowedRoles="admin"><Students /></ProtectedRoute>} />
+          <Route path="/admin/add-student" element={<ProtectedRoute allowedRoles="admin"><AddStudent /></ProtectedRoute>} />
+          <Route path="/admin/edit-student/:id" element={<ProtectedRoute allowedRoles="admin"><EditStudent /></ProtectedRoute>} />
+          
+          {/* Teacher only routes */}
+          <Route path="/teacher/dashboard" element={<ProtectedRoute allowedRoles="teacher"><TeacherDashboard /></ProtectedRoute>} />
+          
+          {/* Routes accessible by both admin and teacher */}
+          {/* <Route path="/shared/page" element={<ProtectedRoute allowedRoles="all"><SharedPage /></ProtectedRoute>} /> */}
+          
           <Route path="*" element={<Navigate to="/bejelentkezes" replace />} />
         </Routes>
       </BrowserRouter>

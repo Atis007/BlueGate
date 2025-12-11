@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { hash } from 'bcryptjs';
 import { supabase } from '../lib/supabase';
 import './AddStudent.css';
 
@@ -42,7 +43,7 @@ export default function EditStudent() {
         setFormData({
           nev: data.nev,
           indexszam: data.indexszam,
-          jelszo: data.jelszo,
+          jelszo: '', // Don't show the hashed password, leave empty for new password input
         });
       }
     } catch (error) {
@@ -65,9 +66,8 @@ export default function EditStudent() {
       newErrors.indexszam = 'Az index szám megadása kötelező';
     }
 
-    if (!formData.jelszo.trim()) {
-      newErrors.jelszo = 'A jelszó megadása kötelező';
-    } else if (formData.jelszo.length < 6) {
+    // Password is optional when editing - only validate if provided
+    if (formData.jelszo.trim() && formData.jelszo.length < 6) {
       newErrors.jelszo = 'A jelszónak legalább 6 karakter hosszúnak kell lennie';
     }
 
@@ -85,13 +85,20 @@ export default function EditStudent() {
     setIsSubmitting(true);
 
     try {
+      // Prepare update data
+      const updateData: { nev: string; indexszam: string; jelszo?: string } = {
+        nev: formData.nev,
+        indexszam: formData.indexszam,
+      };
+
+      // Only update password if a new one was provided
+      if (formData.jelszo.trim()) {
+        updateData.jelszo = await hash(formData.jelszo, 10);
+      }
+
       const { error } = await supabase
         .from('diak')
-        .update({
-          nev: formData.nev,
-          indexszam: formData.indexszam,
-          jelszo: formData.jelszo,
-        })
+        .update(updateData)
         .eq('id', id);
 
       if (error) {
@@ -175,13 +182,13 @@ export default function EditStudent() {
 
         {/* Jelszó */}
         <div className="form-group">
-          <label htmlFor="jelszo">Jelszó</label>
+          <label htmlFor="jelszo">Új jelszó (opcionális)</label>
           <div className="password-input-wrapper">
             <input
               type={showPassword ? 'text' : 'password'}
               id="jelszo"
               className={errors.jelszo ? 'input-error' : ''}
-              placeholder="Adja meg a jelszót"
+              placeholder="Hagyja üresen, ha nem szeretné módosítani"
               value={formData.jelszo}
               onChange={(e) => updateField('jelszo', e.target.value)}
               disabled={isSubmitting}
