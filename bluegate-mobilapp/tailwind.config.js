@@ -8,6 +8,7 @@ module.exports = {
         primary: "#11dee8",
         "background-light": "#f6f8f8",
         "background-dark": "#010e0e",
+        "text-dark": "#f1e4e4",
         text: {
           light: "#f1e4e4",
           muted: "rgba(241, 228, 228, 0.6)",
