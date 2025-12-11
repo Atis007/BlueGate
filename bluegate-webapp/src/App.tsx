@@ -1,12 +1,10 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import type { ChangeEvent, FormEvent, ReactNode } from 'react'
 import { useState } from 'react'
 import './App.css'
 import Students from './admin/Students'
 import AddStudent from './admin/AddStudent'
 import EditStudent from './admin/EditStudent'
-
-function App() {
 import { SupabaseAuthProvider, useSupabaseSession } from './hooks/useSupabaseSession'
 
 function Header() {
@@ -26,63 +24,26 @@ function Header() {
   )
 }
 
-type Role = 'admin' | 'teacher'
-
-const ROLE_ACCESS: Record<Role, string[]> = {
-  admin: ['/', '/bejelentkezes'],
-  teacher: ['/bejelentkezes'],
-}
-
-const PROTECTED_PATHS: string[] = ['/dashboard', '/felulet']
-
-const normalizePath = (path: string) => {
-  if (!path) return '/'
-  const trimmed = path.replace(/\/+$/, '')
-  return trimmed.length === 0 ? '/' : trimmed
-}
-
-const resolveRoleFromContext = (
-  sessionRole: Role | undefined,
-  metadataRole: string | undefined,
-): Role => {
-  if (sessionRole) {
-    return sessionRole
-  }
-  if (metadataRole === 'teacher') {
-    return 'teacher'
-  }
-  return 'admin'
-}
-
-function RouteMiddleware({ children }: { children: ReactNode }) {
+function ProtectedRoute({ children }: { children: ReactNode }) {
+  const { adminProfile, status } = useSupabaseSession()
   const location = useLocation()
-  const { session, status, adminProfile } = useSupabaseSession()
-  const normalizedPath = normalizePath(location.pathname)
-  const activeRole = resolveRoleFromContext(adminProfile?.role, session?.user?.app_metadata?.role)
-  const allowedPaths = ROLE_ACCESS[activeRole]
-  const isProtectedPath = PROTECTED_PATHS.includes(normalizedPath)
-  const isAuthenticated = Boolean(session || adminProfile)
-
-  if (!allowedPaths.includes(normalizedPath)) {
-    return <Navigate to="/bejelentkezes" replace state={{ from: location.pathname }} />
-  }
 
   if (status === 'loading') {
     return <div className="loading-screen">Kapcsolódás az autentikációhoz…</div>
   }
 
-  if (isProtectedPath && !isAuthenticated) {
-    return <Navigate to="/bejelentkezes" replace state={{ from: normalizedPath }} />
+  if (!adminProfile) {
+    return <Navigate to="/bejelentkezes" replace state={{ from: location.pathname }} />
   }
 
-  return children
+  return <>{children}</>
 }
 
 function LoginPage() {
   const { adminProfile, status, error, signOut, signInWithAdmin } = useSupabaseSession()
+  const navigate = useNavigate()
   const [formState, setFormState] = useState({ email: '', password: '' })
   const [formError, setFormError] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleInputChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -94,17 +55,15 @@ function LoginPage() {
     event.preventDefault()
     setIsSubmitting(true)
     setFormError(null)
-    setSuccessMessage(null)
 
     const result = await signInWithAdmin({ email: formState.email, password: formState.password })
 
     if (!result.ok) {
       setFormError(result.message ?? 'Sikertelen bejelentkezés.')
+      setIsSubmitting(false)
     } else {
-      setSuccessMessage('Sikeres bejelentkezés! A felület hamarosan további modulokkal bővül.')
+      navigate('/admin/students')
     }
-
-    setIsSubmitting(false)
   }
 
   const isReady = status === 'ready'
@@ -112,14 +71,6 @@ function LoginPage() {
   const isLoggedIn = Boolean(adminProfile)
 
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Navigate to="/admin/students" replace />} />
-        <Route path="/admin/students" element={<Students />} />
-        <Route path="/admin/add-student" element={<AddStudent />} />
-        <Route path="/admin/edit-student/:id" element={<EditStudent />} />
-      </Routes>
-    </Router>
     <div className="login-shell">
       <div>
         <p className="hero-eyebrow">BlueGate Admin</p>
@@ -129,7 +80,6 @@ function LoginPage() {
 
       {error && <p className="alert alert-error">{error}</p>}
       {formError && <p className="alert alert-error">{formError}</p>}
-      {successMessage && <p className="alert alert-success">{successMessage}</p>}
 
       {isLoggedIn ? (
         <div className="login-success">
@@ -184,13 +134,14 @@ function App() {
     <SupabaseAuthProvider>
       <BrowserRouter>
         <Header />
-        <RouteMiddleware>
-          <Routes>
-            <Route path="/" element={<Navigate to="/bejelentkezes" replace />} />
-            <Route path="/bejelentkezes" element={<LoginPage />} />
-            <Route path="*" element={<Navigate to="/bejelentkezes" replace />} />
-          </Routes>
-        </RouteMiddleware>
+        <Routes>
+          <Route path="/" element={<Navigate to="/bejelentkezes" replace />} />
+          <Route path="/bejelentkezes" element={<LoginPage />} />
+          <Route path="/admin/students" element={<ProtectedRoute><Students /></ProtectedRoute>} />
+          <Route path="/admin/add-student" element={<ProtectedRoute><AddStudent /></ProtectedRoute>} />
+          <Route path="/admin/edit-student/:id" element={<ProtectedRoute><EditStudent /></ProtectedRoute>} />
+          <Route path="*" element={<Navigate to="/bejelentkezes" replace />} />
+        </Routes>
       </BrowserRouter>
     </SupabaseAuthProvider>
   )
