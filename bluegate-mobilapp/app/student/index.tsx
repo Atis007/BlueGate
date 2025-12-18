@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { StyleSheet, TouchableOpacity, Text, Alert, Platform, PermissionsAndroid } from 'react-native';
 import * as IntentLauncher from 'expo-intent-launcher';
+import BleAdvertiser from '@/modules/ble-advertiser';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -13,34 +14,27 @@ export default function StudentIndex() {
   const [isAdvertising, setIsAdvertising] = useState(false);
   const [bleAvailable, setBleAvailable] = useState<boolean | null>(null);
   const [statusMessage, setStatusMessage] = useState<string>('');
-  const blePeripheralRef = useRef<any>(null);
 
   // Generate the student identifier to broadcast
-  const studentIdentifier = studentProfile?.indexNumber 
-    ? `student${studentProfile.indexNumber}` 
-    : '';
+  // Teljes indexszám - a device name-ben küldjük
+  const studentIdentifier = studentProfile?.indexNumber || '';
 
   useEffect(() => {
-    // Try to initialize BLE peripheral
-    const initBle = async () => {
-      try {
-        const BlePeripheral = await import('react-native-ble-peripheral');
-        blePeripheralRef.current = BlePeripheral.default;
-        setBleAvailable(true);
-        setStatusMessage('Bluetooth elérhető');
-      } catch (error) {
-        console.log('BLE Peripheral not available:', error);
-        setBleAvailable(false);
-        setStatusMessage('BLE nem elérhető. Development build szükséges.');
-      }
-    };
-
-    initBle();
+    // Check if BLE Advertiser module is available
+    if (BleAdvertiser) {
+      setBleAvailable(true);
+      setStatusMessage('Bluetooth elérhető');
+    } else {
+      setBleAvailable(false);
+      setStatusMessage('BLE Advertiser nem elérhető');
+    }
 
     return () => {
       // Stop advertising on unmount
-      if (blePeripheralRef.current && isAdvertising) {
-        blePeripheralRef.current.stop();
+      if (isAdvertising && BleAdvertiser) {
+        BleAdvertiser.stopAdvertising().catch((error: any) => {
+          console.error('Error stopping advertising on unmount:', error);
+        });
       }
     };
   }, []);
@@ -73,23 +67,13 @@ export default function StudentIndex() {
   };
 
   const startAdvertising = async () => {
-    if (!bleAvailable || !blePeripheralRef.current) {
-      // Fallback: open Bluetooth settings
+    if (!bleAvailable || !BleAdvertiser) {
+      // Fallback: show info
       Alert.alert(
         'Bluetooth nem elérhető',
-        `Development build szükséges a BLE sugárzáshoz.\n\nSugárzandó adatok:\n- Service UUID: ${SERVICE_UUID}\n- Azonosító: ${studentIdentifier}`,
+        `BLE Advertiser nem elérhető.\n\nSugárzandó adatok:\n- Service UUID: ${SERVICE_UUID}\n- Azonosító: ${studentIdentifier}`,
         [
-          { text: 'Mégse', style: 'cancel' },
-          {
-            text: 'Bluetooth beállítások',
-            onPress: async () => {
-              if (Platform.OS === 'android') {
-                await IntentLauncher.startActivityAsync(
-                  IntentLauncher.ActivityAction.BLUETOOTH_SETTINGS
-                );
-              }
-            },
-          },
+          { text: 'OK', style: 'cancel' },
         ]
       );
       return;
@@ -103,46 +87,21 @@ export default function StudentIndex() {
         return;
       }
 
-      const BlePeripheral = blePeripheralRef.current;
+      // Start advertising using native module
+      const result = await BleAdvertiser.startAdvertising(SERVICE_UUID, studentIdentifier);
       
-      // Add service with characteristic containing student identifier
-      await BlePeripheral.addService(SERVICE_UUID, true);
+      console.log('BLE Advertising started:', result);
+      console.log('Service UUID:', SERVICE_UUID);
+      console.log('Student Identifier:', studentIdentifier);
       
-      // Create characteristic UUID (we'll use a fixed one for the student ID data)
-      const CHARACTERISTIC_UUID = '00002a00-0000-1000-8000-00805f9b34fb';
+      setIsAdvertising(true);
+      setStatusMessage(`Sugárzás aktív\nService: ${SERVICE_UUID}\nAzonosító: ${studentIdentifier}`);
       
-      // Add characteristic with student identifier as value
-      await BlePeripheral.addCharacteristicToService(
-        SERVICE_UUID,
-        CHARACTERISTIC_UUID,
-        16 | 1, // read + broadcast
-        8 // readable permission
+      Alert.alert(
+        'Sugárzás elindítva',
+        `A telefon most sugározza az adatokat:\n\n• Service UUID:\n${SERVICE_UUID}\n\n• Azonosító:\n${studentIdentifier}`,
+        [{ text: 'OK' }]
       );
-
-      // Convert student identifier to bytes for service data
-      const encoder = new TextEncoder();
-      const studentIdBytes = Array.from(encoder.encode(studentIdentifier));
-
-      // Start advertising with service data
-      await BlePeripheral.start()
-        .then(() => {
-          console.log('BLE Advertising started successfully');
-          console.log('Service UUID:', SERVICE_UUID);
-          console.log('Student Identifier:', studentIdentifier);
-          
-          setIsAdvertising(true);
-          setStatusMessage(`Sugárzás aktív\nService: ${SERVICE_UUID}\nAzonosító: ${studentIdentifier}`);
-          
-          Alert.alert(
-            'Sugárzás elindítva',
-            `A telefon most sugározza az adatokat:\n\n• Service UUID:\n${SERVICE_UUID}\n\n• Azonosító:\n${studentIdentifier}`,
-            [{ text: 'OK' }]
-          );
-        })
-        .catch((error: any) => {
-          console.error('Failed to start advertising:', error);
-          Alert.alert('Hiba', 'Nem sikerült elindítani a sugárzást: ' + error.message);
-        });
 
     } catch (error: any) {
       console.error('Error starting advertising:', error);
@@ -152,8 +111,8 @@ export default function StudentIndex() {
 
   const stopAdvertising = async () => {
     try {
-      if (blePeripheralRef.current) {
-        await blePeripheralRef.current.stop();
+      if (BleAdvertiser) {
+        await BleAdvertiser.stopAdvertising();
       }
       setIsAdvertising(false);
       setStatusMessage('Sugárzás leállítva');
