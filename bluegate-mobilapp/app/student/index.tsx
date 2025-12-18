@@ -1,13 +1,29 @@
 import { useState, useEffect } from 'react';
 import { StyleSheet, TouchableOpacity, Text, Alert, Platform, PermissionsAndroid } from 'react-native';
-import * as IntentLauncher from 'expo-intent-launcher';
-import BleAdvertiser from '@/modules/ble-advertiser';
+import Constants from 'expo-constants';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAuth } from '@/hooks/use-auth';
 
-const SERVICE_UUID = process.env.EXPO_PUBLIC_APP_SERVICE_UUID || '';
+const expoExtra = Constants.expoConfig?.extra || {};
+const SERVICE_UUID =
+  process.env.EXPO_PUBLIC_APP_SERVICE_UUID || (expoExtra.appServiceUuid as string) || '';
+
+type BleAdvertiserModule = {
+  startAdvertising: (serviceUuid: string, identifier: string) => Promise<unknown>;
+  stopAdvertising: () => Promise<void>;
+};
+
+const bleAdvertiser: BleAdvertiserModule | null = (() => {
+  try {
+    const module = require('@/modules/ble-advertiser');
+    return module?.default ?? module;
+  } catch (error) {
+    console.warn('[BLE] Native advertiser module unavailable, running in fallback mode.');
+    return null;
+  }
+})();
 
 export default function StudentIndex() {
   const { studentProfile, signOut } = useAuth();
@@ -21,7 +37,7 @@ export default function StudentIndex() {
 
   useEffect(() => {
     // Check if BLE Advertiser module is available
-    if (BleAdvertiser) {
+    if (bleAdvertiser) {
       setBleAvailable(true);
       setStatusMessage('Bluetooth elérhető');
     } else {
@@ -31,8 +47,8 @@ export default function StudentIndex() {
 
     return () => {
       // Stop advertising on unmount
-      if (isAdvertising && BleAdvertiser) {
-        BleAdvertiser.stopAdvertising().catch((error: any) => {
+      if (isAdvertising && bleAdvertiser) {
+        bleAdvertiser.stopAdvertising().catch((error: any) => {
           console.error('Error stopping advertising on unmount:', error);
         });
       }
@@ -67,7 +83,7 @@ export default function StudentIndex() {
   };
 
   const startAdvertising = async () => {
-    if (!bleAvailable || !BleAdvertiser) {
+    if (!bleAvailable || !bleAdvertiser) {
       // Fallback: show info
       Alert.alert(
         'Bluetooth nem elérhető',
@@ -88,7 +104,7 @@ export default function StudentIndex() {
       }
 
       // Start advertising using native module
-      const result = await BleAdvertiser.startAdvertising(SERVICE_UUID, studentIdentifier);
+      const result = await bleAdvertiser.startAdvertising(SERVICE_UUID, studentIdentifier);
       
       console.log('BLE Advertising started:', result);
       console.log('Service UUID:', SERVICE_UUID);
@@ -111,8 +127,8 @@ export default function StudentIndex() {
 
   const stopAdvertising = async () => {
     try {
-      if (BleAdvertiser) {
-        await BleAdvertiser.stopAdvertising();
+      if (bleAdvertiser) {
+        await bleAdvertiser.stopAdvertising();
       }
       setIsAdvertising(false);
       setStatusMessage('Sugárzás leállítva');
