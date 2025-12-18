@@ -1,0 +1,8 @@
+# Ignore everything except bluegate-mobilapp
+bluegate-webapp/
+raspberry/
+README.md
+
+# Also ignore git files and other common stuff
+.git/
+*.log
