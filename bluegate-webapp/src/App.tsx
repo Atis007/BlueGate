@@ -1,27 +1,69 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, NavLink } from 'react-router-dom'
 import type { ChangeEvent, FormEvent, ReactNode } from 'react'
 import { useState, useEffect } from 'react'
 import './App.css'
 import Students from './admin/Students'
 import AddStudent from './admin/AddStudent'
 import EditStudent from './admin/EditStudent'
+import Teachers from './admin/Teachers'
+import AddTeacher from './admin/AddTeacher'
+import EditTeacher from './admin/EditTeacher'
 import TeacherDashboard from './teacher/Dashboard'
 import { SupabaseAuthProvider, useSupabaseSession } from './hooks/useSupabaseSession'
 
 function Header() {
   const { userProfile, signOut } = useSupabaseSession()
 
+  const getNavItems = () => {
+    if (!userProfile) {
+      return [] as Array<{ to: string; label: string }>
+    }
+
+    if (userProfile.role === 'admin') {
+      return [
+        { to: '/admin/students', label: 'Diákok' },
+        { to: '/admin/teachers', label: 'Tanárok' },
+      ]
+    }
+
+    if (userProfile.role === 'teacher') {
+      return [{ to: '/teacher/dashboard', label: 'Dashboard' }]
+    }
+
+    return []
+  }
+
   if (!userProfile) {
     return null
   }
 
+  const navItems = getNavItems()
+
   return (
     <header className="app-header">
-      <span className="user-email">{userProfile.email}</span>
-      <span className="user-role">({userProfile.role === 'admin' ? 'Admin' : 'Tanár'})</span>
-      <button type="button" onClick={signOut} className="logout-link">
-        Kijelentkezés
-      </button>
+      <div className="app-header-left">
+        {navItems.length > 0 && (
+          <nav className="header-nav" aria-label="Fő navigáció">
+            {navItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) => `header-nav-link${isActive ? ' active' : ''}`}
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
+        )}
+      </div>
+
+      <div className="app-header-right">
+        <span className="user-email">{userProfile.email}</span>
+        <span className="user-role">({userProfile.role === 'admin' ? 'Admin' : 'Tanár'})</span>
+        <button type="button" onClick={signOut} className="logout-link">
+          Kijelentkezés
+        </button>
+      </div>
     </header>
   )
 }
@@ -183,6 +225,10 @@ function App() {
           <Route path="/admin/students" element={<ProtectedRoute allowedRoles="admin"><Students /></ProtectedRoute>} />
           <Route path="/admin/add-student" element={<ProtectedRoute allowedRoles="admin"><AddStudent /></ProtectedRoute>} />
           <Route path="/admin/edit-student/:id" element={<ProtectedRoute allowedRoles="admin"><EditStudent /></ProtectedRoute>} />
+
+          <Route path="/admin/teachers" element={<ProtectedRoute allowedRoles="admin"><Teachers /></ProtectedRoute>} />
+          <Route path="/admin/add-teacher" element={<ProtectedRoute allowedRoles="admin"><AddTeacher /></ProtectedRoute>} />
+          <Route path="/admin/edit-teacher/:id" element={<ProtectedRoute allowedRoles="admin"><EditTeacher /></ProtectedRoute>} />
           
           {/* Teacher only routes */}
           <Route path="/teacher/dashboard" element={<ProtectedRoute allowedRoles="teacher"><TeacherDashboard /></ProtectedRoute>} />
