@@ -22,9 +22,51 @@ export default function Teachers() {
   const [teacherSubjects, setTeacherSubjects] = useState<Record<string, number[]>>({});
   const [selectedSubjectIds, setSelectedSubjectIds] = useState<Record<string, number[]>>({});
   const [openSubjectsDropdownFor, setOpenSubjectsDropdownFor] = useState<string | null>(null);
+  const [subjectsDropdownDirection, setSubjectsDropdownDirection] = useState<Record<string, 'up' | 'down'>>({});
   const [isUpdatingTeacherSubjects, setIsUpdatingTeacherSubjects] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>(10);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    if (!openSubjectsDropdownFor) {
+      return;
+    }
+
+    const teacherId = openSubjectsDropdownFor;
+
+    const raf1 = requestAnimationFrame(() => {
+      const trigger = document.querySelector<HTMLButtonElement>(`button[data-subjects-trigger="${teacherId}"]`);
+      const dropdown = trigger?.closest<HTMLElement>('.subjects-dropdown');
+      const wrapper = trigger?.closest<HTMLElement>('.list-table-wrapper');
+
+      if (!trigger || !dropdown || !wrapper) {
+        return;
+      }
+
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const triggerRect = trigger.getBoundingClientRect();
+      const spaceBelow = wrapperRect.bottom - triggerRect.bottom;
+      const spaceAbove = triggerRect.top - wrapperRect.top;
+
+      const raf2 = requestAnimationFrame(() => {
+        const menuEl = dropdown.querySelector<HTMLElement>('.subjects-menu');
+        const menuHeight = menuEl?.getBoundingClientRect().height ?? 220;
+
+        // Ha alul kevés hely, próbáljuk felfelé nyitni.
+        const shouldOpenUp = spaceBelow < menuHeight + 8 && spaceAbove > spaceBelow;
+        setSubjectsDropdownDirection((prev) => ({
+          ...prev,
+          [teacherId]: shouldOpenUp ? 'up' : 'down',
+        }));
+      });
+
+      return () => cancelAnimationFrame(raf2);
+    });
+
+    return () => cancelAnimationFrame(raf1);
+  }, [openSubjectsDropdownFor]);
 
   useEffect(() => {
     fetchTeachers();
@@ -175,6 +217,31 @@ export default function Teachers() {
     teacher.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Pagination számítások
+  const totalItems = filteredTeachers.length;
+  const totalPages = itemsPerPage === 'all' ? 1 : Math.ceil(totalItems / itemsPerPage);
+  
+  // Aktuális oldal reset ha túlindexelne
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  // Megjelenített tanárok
+  const displayedTeachers = itemsPerPage === 'all' 
+    ? filteredTeachers 
+    : filteredTeachers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const handleItemsPerPageChange = (value: number | 'all') => {
+    setItemsPerPage(value);
+    setCurrentPage(1);
+  };
+
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
+
   const handleDeleteTeacher = async (id: string) => {
     if (!window.confirm('Biztosan törölni szeretnéd ezt a tanárt?')) {
       return;
@@ -234,6 +301,26 @@ export default function Teachers() {
         </div>
       </div>
 
+      {!isLoading && filteredTeachers.length > 0 && (
+        <div className="table-controls">
+          <div className="items-per-page">
+            <label>Megjelenítés:</label>
+            <select value={itemsPerPage} onChange={(e) => handleItemsPerPageChange(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}>
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value="all">Összes</option>
+            </select>
+            <span className="items-info">
+              {itemsPerPage === 'all' 
+                ? `Összes tanár (${totalItems})` 
+                : `${(currentPage - 1) * itemsPerPage + 1}-${Math.min(currentPage * itemsPerPage, totalItems)} / ${totalItems}`
+              }
+            </span>
+          </div>
+        </div>
+      )}
+
       <div className="students-list">
         {isLoading ? (
           <div className="loading-state">
@@ -262,14 +349,16 @@ export default function Teachers() {
             <p>{searchQuery ? 'Nincs találat a keresésre' : 'Még nincs hozzáadott tanár'}</p>
           </div>
         ) : (
-          <div className="list-table teachers-table">
-            <div className="list-row list-header" role="row">
-              <div className="list-cell" role="columnheader">Név</div>
-              <div className="list-cell" role="columnheader">Email</div>
-              <div className="list-cell" role="columnheader">Tantárgyak</div>
-              <div className="list-cell actions" role="columnheader">Műveletek</div>
-            </div>
-            {filteredTeachers.map((teacher) => (
+          <>
+            <div className="list-table-wrapper">
+              <div className="list-table teachers-table">
+                <div className="list-row list-header" role="row">
+                  <div className="list-cell" role="columnheader">Név</div>
+                  <div className="list-cell" role="columnheader">Email</div>
+                  <div className="list-cell" role="columnheader">Tantárgyak</div>
+                  <div className="list-cell actions" role="columnheader">Műveletek</div>
+                </div>
+                {displayedTeachers.map((teacher) => (
               <div key={teacher.id} className="list-row" role="row">
                 <div className="list-cell" role="cell">
                   <div className="row-title">{teacher.nev}</div>
@@ -280,11 +369,16 @@ export default function Teachers() {
                 <div className="list-cell" role="cell">
                   <div className="subjects-cell">
                     <div className="subjects-add">
-                      <div className={`subjects-dropdown ${subjects.length === 0 ? 'is-disabled' : ''}`}>
+                      <div
+                        className={`subjects-dropdown ${subjects.length === 0 ? 'is-disabled' : ''} ${
+                          subjectsDropdownDirection[teacher.id] === 'up' ? 'open-up' : ''
+                        }`}
+                      >
                         <button
                           type="button"
                           className="subjects-trigger"
                           onClick={() => setOpenSubjectsDropdownFor((prev) => (prev === teacher.id ? null : teacher.id))}
+                          data-subjects-trigger={teacher.id}
                           disabled={subjects.length === 0 || Boolean(isUpdatingTeacherSubjects[teacher.id])}
                         >
                           {subjects.length === 0 ? (
@@ -366,7 +460,58 @@ export default function Teachers() {
                 </div>
               </div>
             ))}
-          </div>
+              </div>
+            </div>
+
+            {itemsPerPage !== 'all' && totalPages > 1 && (
+              <div className="pagination">
+                <button 
+                  className="pagination-button" 
+                  onClick={() => goToPage(currentPage - 1)} 
+                  disabled={currentPage === 1}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M15 18l-6-6 6-6" />
+                  </svg>
+                  Előző
+                </button>
+                
+                <div className="pagination-numbers">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                    if (
+                      page === 1 ||
+                      page === totalPages ||
+                      (page >= currentPage - 1 && page <= currentPage + 1)
+                    ) {
+                      return (
+                        <button
+                          key={page}
+                          className={`pagination-number ${page === currentPage ? 'active' : ''}`}
+                          onClick={() => goToPage(page)}
+                        >
+                          {page}
+                        </button>
+                      );
+                    } else if (page === currentPage - 2 || page === currentPage + 2) {
+                      return <span key={page} className="pagination-ellipsis">...</span>;
+                    }
+                    return null;
+                  })}
+                </div>
+
+                <button 
+                  className="pagination-button" 
+                  onClick={() => goToPage(currentPage + 1)} 
+                  disabled={currentPage === totalPages}
+                >
+                  Következő
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M9 18l6-6-6-6" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

@@ -239,6 +239,7 @@
 }
 
 .subjects-dropdown {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 220px;
@@ -287,6 +288,10 @@
 }
 
 .subjects-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
   margin-top: 6px;
   padding: 8px;
   border: 1px solid #1e3a52;
@@ -294,6 +299,15 @@
   background: #0a1929;
   max-height: 220px;
   overflow: auto;
+  z-index: 100;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+}
+
+.subjects-dropdown.open-up .subjects-menu {
+  top: auto;
+  bottom: 100%;
+  margin-top: 0;
+  margin-bottom: 6px;
 }
 
 .subjects-item {
@@ -559,4 +573,162 @@
   .student-details {
     font-size: 0.8rem;
   }
+}
+/* ============================================ */
+/* TABLE CONTROLS & PAGINATION */
+/* ============================================ */
+
+.table-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding: 0.75rem 1.25rem;
+  background-color: #132f4c;
+  border: 1px solid #1e3a52;
+  border-radius: 10px;
+}
+
+.items-per-page {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.items-per-page label {
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.items-per-page select {
+  padding: 0.5rem 2rem 0.5rem 0.75rem;
+  font-size: 0.9rem;
+  border: 1px solid #1e3a52;
+  border-radius: 8px;
+  background-color: #0a1929;
+  color: #ffffff;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2300d9ff' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 12px;
+}
+
+.items-per-page select:focus {
+  outline: none;
+  border-color: #00d9ff;
+  box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.1);
+}
+
+.items-info {
+  color: #8fa3b0;
+  font-size: 0.9rem;
+}
+
+/* Scrollable table wrapper */
+.list-table-wrapper {
+  max-height: 600px;
+  overflow-y: auto;
+  border: 1px solid #1e3a52;
+  border-radius: 10px;
+  background-color: #132f4c;
+}
+
+.list-table-wrapper::-webkit-scrollbar {
+  width: 10px;
+}
+
+.list-table-wrapper::-webkit-scrollbar-track {
+  background: #0a1929;
+  border-radius: 10px;
+}
+
+.list-table-wrapper::-webkit-scrollbar-thumb {
+  background: #1e3a52;
+  border-radius: 10px;
+}
+
+.list-table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #00d9ff;
+}
+
+.list-table-wrapper .list-table {
+  border: none;
+  border-radius: 0;
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  padding: 1rem;
+}
+
+.pagination-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  font-size: 0.95rem;
+  border: 1px solid #1e3a52;
+  border-radius: 8px;
+  background-color: #132f4c;
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pagination-button:hover:not(:disabled) {
+  background-color: #1a4565;
+  border-color: #00d9ff;
+}
+
+.pagination-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pagination-numbers {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.pagination-number {
+  min-width: 40px;
+  height: 40px;
+  padding: 0.5rem;
+  font-size: 0.95rem;
+  border: 1px solid #1e3a52;
+  border-radius: 8px;
+  background-color: #132f4c;
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pagination-number:hover {
+  background-color: #1a4565;
+  border-color: #00d9ff;
+}
+
+.pagination-number.active {
+  background-color: #00d9ff;
+  color: #0a1929;
+  border-color: #00d9ff;
+  font-weight: 600;
+}
+
+.pagination-ellipsis {
+  color: #8fa3b0;
+  padding: 0 0.5rem;
+  font-size: 1.2rem;
 }
