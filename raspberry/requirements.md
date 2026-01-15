@@ -1,12 +1,14 @@
-# BLE Scanner – Requirements
+# BLE Scanner + Web UI – Requirements
 
-Ez a projekt egy egyszeri lefutású Bluetooth Low Energy (BLE) scanner Raspberry Pi és Windows számára.
+Ez a projekt egy Bluetooth Low Energy (BLE) scanner és egy egyszerű Flask web UI.
 
-## 📦 Python csomagok telepítése
+## 📦 Python csomagok
 
-A projekt működéséhez az alábbi csomagok szükségesek:
+Telepítés venv-ben:
 
 ```bash
 pip install bleak
 pip install python-dotenv
 pip install httpx
+pip install flask
+```
