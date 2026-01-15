@@ -35,8 +35,8 @@ export default function Teachers() {
       const [{ data: teachersData, error: teachersError }, { data: subjectsData, error: subjectsError }, { data: linksData, error: linksError }] =
         await Promise.all([
           supabase.from('teacher').select('*').order('nev', { ascending: true }),
-          supabase.from('tantargy').select('id, nev').order('nev', { ascending: true }),
-          supabase.from('teacher_tantargy').select('teacher_id, tantargy_id'),
+          supabase.from('courses').select('id, nev').order('nev', { ascending: true }),
+          supabase.from('teacher_courses').select('teacher_id, course_id'),
         ]);
 
       if (teachersError) {
@@ -59,11 +59,11 @@ export default function Teachers() {
       setSubjects((subjectsData as Subject[]) || []);
 
       const map: Record<string, number[]> = {};
-      (linksData as Array<{ teacher_id: string; tantargy_id: number }> | null)?.forEach((row) => {
+      (linksData as Array<{ teacher_id: string; course_id: number }> | null)?.forEach((row) => {
         if (!map[row.teacher_id]) {
           map[row.teacher_id] = [];
         }
-        map[row.teacher_id].push(row.tantargy_id);
+        map[row.teacher_id].push(row.course_id);
       });
       setTeacherSubjects(map);
     } catch (error) {
@@ -107,8 +107,8 @@ export default function Teachers() {
     try {
       setIsUpdatingTeacherSubjects((prev) => ({ ...prev, [teacherId]: true }));
       const { error } = await supabase
-        .from('teacher_tantargy')
-        .insert(toAdd.map((subjectId) => ({ teacher_id: teacherId, tantargy_id: subjectId })));
+        .from('teacher_courses')
+        .insert(toAdd.map((subjectId) => ({ teacher_id: teacherId, course_id: subjectId })));
 
       if (error) {
         console.error('Hiba történt:', error);
@@ -146,10 +146,10 @@ export default function Teachers() {
     try {
       setIsUpdatingTeacherSubjects((prev) => ({ ...prev, [teacherId]: true }));
       const { error } = await supabase
-        .from('teacher_tantargy')
+        .from('teacher_courses')
         .delete()
         .eq('teacher_id', teacherId)
-        .in('tantargy_id', toRemove);
+        .in('course_id', toRemove);
 
       if (error) {
         console.error('Hiba történt:', error);

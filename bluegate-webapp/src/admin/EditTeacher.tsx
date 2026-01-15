@@ -69,8 +69,8 @@ export default function EditTeacher() {
 
     try {
       const [{ data: subjectsData, error: subjectsError }, { data: linksData, error: linksError }] = await Promise.all([
-        supabase.from('tantargy').select('id, nev').order('nev', { ascending: true }),
-        supabase.from('teacher_tantargy').select('tantargy_id').eq('teacher_id', id),
+        supabase.from('courses').select('id, nev').order('nev', { ascending: true }),
+        supabase.from('teacher_courses').select('course_id').eq('teacher_id', id),
       ]);
 
       if (subjectsError) {
@@ -83,7 +83,7 @@ export default function EditTeacher() {
       const loadedSubjects = (subjectsData as Array<{ id: number; nev: string }> | null) ?? [];
       setSubjects(loadedSubjects);
 
-      const assigned = ((linksData as Array<{ tantargy_id: number }> | null) ?? []).map((r) => r.tantargy_id);
+      const assigned = ((linksData as Array<{ course_id: number }> | null) ?? []).map((r) => r.course_id);
       setSelectedSubjectIds(assigned);
     } catch (error) {
       console.error('Hiba történt:', error);
@@ -154,8 +154,8 @@ export default function EditTeacher() {
       // Tantárgy hozzárendelések mentése
       // Meglévő kapcsolatok lekérése
       const { data: existingLinks, error: existingLinksError } = await supabase
-        .from('teacher_tantargy')
-        .select('tantargy_id')
+        .from('teacher_courses')
+        .select('course_id')
         .eq('teacher_id', id);
 
       if (existingLinksError) {
@@ -164,16 +164,16 @@ export default function EditTeacher() {
         return;
       }
 
-      const existingIds = ((existingLinks as Array<{ tantargy_id: number }> | null) ?? []).map((r) => r.tantargy_id);
+      const existingIds = ((existingLinks as Array<{ course_id: number }> | null) ?? []).map((r) => r.course_id);
       const toAdd = selectedSubjectIds.filter((subjectId) => !existingIds.includes(subjectId));
       const toRemove = existingIds.filter((subjectId) => !selectedSubjectIds.includes(subjectId));
 
       if (toRemove.length > 0) {
         const { error: deleteError } = await supabase
-          .from('teacher_tantargy')
+          .from('teacher_courses')
           .delete()
           .eq('teacher_id', id)
-          .in('tantargy_id', toRemove);
+          .in('course_id', toRemove);
 
         if (deleteError) {
           console.error('Hiba történt:', deleteError);
@@ -184,8 +184,8 @@ export default function EditTeacher() {
 
       if (toAdd.length > 0) {
         const { error: insertError } = await supabase
-          .from('teacher_tantargy')
-          .insert(toAdd.map((subjectId) => ({ teacher_id: id, tantargy_id: subjectId })));
+          .from('teacher_courses')
+          .insert(toAdd.map((subjectId) => ({ teacher_id: id, course_id: subjectId })));
 
         if (insertError) {
           console.error('Hiba történt:', insertError);
