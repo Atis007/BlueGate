@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
-import { StyleSheet, TouchableOpacity, Text, Alert, Platform, PermissionsAndroid } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { StyleSheet, TouchableOpacity, Text, Alert, Platform, PermissionsAndroid, Modal, View, Animated } from 'react-native';
 import * as IntentLauncher from 'expo-intent-launcher';
 import BleAdvertiser from '@/modules/ble-advertiser';
+import { supabase } from '@/lib/supabase';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -14,6 +15,13 @@ export default function StudentIndex() {
   const [isAdvertising, setIsAdvertising] = useState(false);
   const [bleAvailable, setBleAvailable] = useState<boolean | null>(null);
   const [statusMessage, setStatusMessage] = useState<string>('');
+  const [resultModalVisible, setResultModalVisible] = useState(false);
+  const [resultModalMessage, setResultModalMessage] = useState('');
+  const [resultModalTitle, setResultModalTitle] = useState('');
+  const [resultModalVariant, setResultModalVariant] = useState<'success' | 'error'>('success');
+  const hasAttendanceConfirmationRef = useRef(false);
+  const advertisingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const modalPulse = useRef(new Animated.Value(0)).current;
 
   // Generate the student identifier to broadcast
   // Teljes indexszám - a device name-ben küldjük
@@ -30,6 +38,10 @@ export default function StudentIndex() {
     }
 
     return () => {
+      if (advertisingTimeoutRef.current) {
+        clearTimeout(advertisingTimeoutRef.current);
+        advertisingTimeoutRef.current = null;
+      }
       // Stop advertising on unmount
       if (isAdvertising && BleAdvertiser) {
         BleAdvertiser.stopAdvertising().catch((error: any) => {
@@ -38,6 +50,79 @@ export default function StudentIndex() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!resultModalVisible) {
+      modalPulse.setValue(0);
+      return;
+    }
+
+    Animated.sequence([
+      Animated.timing(modalPulse, {
+        toValue: 1,
+        duration: 240,
+        useNativeDriver: true,
+      }),
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(modalPulse, {
+            toValue: 0.9,
+            duration: 900,
+            useNativeDriver: true,
+          }),
+          Animated.timing(modalPulse, {
+            toValue: 1,
+            duration: 900,
+            useNativeDriver: true,
+          }),
+        ])
+      ),
+    ]).start();
+  }, [resultModalVisible, modalPulse]);
+
+  // Listen for attendance updates
+  useEffect(() => {
+    if (!studentProfile?.id || !supabase) return;
+
+    // Feliratkozás az attendance tábla változásaira
+    // Csak a beszúrásokat figyeljük, ahol a diak_id megegyezik a miénkkel
+    const channel = supabase
+      .channel('attendance-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'attendance',
+          filter: `diak_id=eq.${studentProfile.id}`,
+        },
+        (payload) => {
+          console.log('Jelenlét rögzítve:', payload);
+          hasAttendanceConfirmationRef.current = true;
+          if (advertisingTimeoutRef.current) {
+            clearTimeout(advertisingTimeoutRef.current);
+            advertisingTimeoutRef.current = null;
+          }
+          stopAdvertising().catch((error) => {
+            console.error('Error stopping advertising after success:', error);
+          });
+          setResultModalTitle('Sikeres jelentkezés');
+          setResultModalMessage('A rendszer rögzítette a jelenlétedet.');
+          setResultModalVariant('success');
+          setResultModalVisible(true);
+        }
+      )
+      .subscribe((status, err) => {
+        console.log(`[Realtime] Subscription status: ${status}`, err ? err : '');
+        if (status === 'SUBSCRIBED') {
+           console.log(`[Realtime] Listening for INSERT on public.attendance where diak_id=${studentProfile.id}`);
+        }
+      });
+
+    return () => {
+      supabase?.removeChannel(channel);
+    };
+  }, [studentProfile?.id]);
 
   const requestPermissions = async (): Promise<boolean> => {
     if (Platform.OS !== 'android') return true;
@@ -87,6 +172,13 @@ export default function StudentIndex() {
         return;
       }
 
+      if (advertisingTimeoutRef.current) {
+        clearTimeout(advertisingTimeoutRef.current);
+        advertisingTimeoutRef.current = null;
+      }
+
+      hasAttendanceConfirmationRef.current = false;
+
       // Start advertising using native module
       const result = await BleAdvertiser.startAdvertising(SERVICE_UUID, studentIdentifier);
       
@@ -96,6 +188,22 @@ export default function StudentIndex() {
       
       setIsAdvertising(true);
       setStatusMessage(`Sugárzás aktív\nService: ${SERVICE_UUID}\nAzonosító: ${studentIdentifier}`);
+
+      advertisingTimeoutRef.current = setTimeout(() => {
+        if (!hasAttendanceConfirmationRef.current) {
+          stopAdvertising().catch((error) => {
+            console.error('Error stopping advertising after timeout:', error);
+          });
+          setResultModalTitle('Nem érkezett visszaigazolás');
+          setResultModalMessage('Kérdezd meg a tanárt, hogy sikerült-e, valami hiba történt.');
+          setResultModalVariant('error');
+          setResultModalVisible(true);
+        } else {
+          stopAdvertising().catch((error) => {
+            console.error('Error stopping advertising after timeout:', error);
+          });
+        }
+      }, 15 * 1000);
       
       Alert.alert(
         'Sugárzás elindítva',
@@ -111,6 +219,10 @@ export default function StudentIndex() {
 
   const stopAdvertising = async () => {
     try {
+      if (advertisingTimeoutRef.current) {
+        clearTimeout(advertisingTimeoutRef.current);
+        advertisingTimeoutRef.current = null;
+      }
       if (BleAdvertiser) {
         await BleAdvertiser.stopAdvertising();
       }
@@ -140,6 +252,89 @@ export default function StudentIndex() {
 
   return (
     <ThemedView style={styles.container}>
+      <Modal
+        transparent
+        visible={resultModalVisible}
+        animationType="none"
+        onRequestClose={() => setResultModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <Animated.View
+            style={[
+              styles.modalGlow,
+              resultModalVariant === 'success'
+                ? styles.modalGlowSuccess
+                : styles.modalGlowError,
+              {
+                opacity: modalPulse.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.35, 0.9],
+                }),
+                transform: [
+                  {
+                    scale: modalPulse.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.9, 1.05],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.modalCard,
+              resultModalVariant === 'success'
+                ? styles.modalCardSuccess
+                : styles.modalCardError,
+              {
+                opacity: modalPulse.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, 1],
+                }),
+                transform: [
+                  {
+                    translateY: modalPulse.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [30, 0],
+                    }),
+                  },
+                  {
+                    scale: modalPulse.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.95, 1],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <View
+                style={[
+                  styles.modalAccent,
+                  resultModalVariant === 'success'
+                    ? styles.modalAccentSuccess
+                    : styles.modalAccentError,
+                ]}
+              />
+              <ThemedText style={styles.modalTitle}>{resultModalTitle}</ThemedText>
+            </View>
+            <ThemedText style={styles.modalMessage}>{resultModalMessage}</ThemedText>
+            <TouchableOpacity
+              style={[
+                styles.modalButton,
+                resultModalVariant === 'success'
+                  ? styles.modalButtonSuccess
+                  : styles.modalButtonError,
+              ]}
+              onPress={() => setResultModalVisible(false)}
+            >
+              <Text style={styles.modalButtonText}>Rendben</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
+      </Modal>
       <ThemedView style={styles.header}>
         <ThemedText type="title">Üdvözöljük!</ThemedText>
         <ThemedText style={styles.name}>{studentProfile?.name}</ThemedText>
@@ -263,5 +458,96 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(5, 7, 12, 0.82)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  modalGlow: {
+    position: 'absolute',
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    shadowOpacity: 0.9,
+    shadowRadius: 30,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  modalGlowSuccess: {
+    backgroundColor: '#22c55e',
+    shadowColor: '#22c55e',
+  },
+  modalGlowError: {
+    backgroundColor: '#ef4444',
+    shadowColor: '#ef4444',
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: 24,
+    paddingVertical: 22,
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.65,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 16 },
+    elevation: 16,
+  },
+  modalCardSuccess: {
+    backgroundColor: '#081417',
+    borderColor: '#1b4b3a',
+  },
+  modalCardError: {
+    backgroundColor: '#0b0f17',
+    borderColor: '#1f2a44',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  modalAccent: {
+    width: 10,
+    height: 52,
+    borderRadius: 6,
+  },
+  modalAccentSuccess: {
+    backgroundColor: '#22c55e',
+  },
+  modalAccentError: {
+    backgroundColor: '#ef4444',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#f8fafc',
+  },
+  modalMessage: {
+    fontSize: 15,
+    color: '#cbd5f5',
+    lineHeight: 21,
+    marginBottom: 20,
+  },
+  modalButton: {
+    borderRadius: 12,
+    height: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalButtonSuccess: {
+    backgroundColor: '#16a34a',
+  },
+  modalButtonError: {
+    backgroundColor: '#ef4444',
+  },
+  modalButtonText: {
+    color: '#f8fafc',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
 });
