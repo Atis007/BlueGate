@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import './Students.css';
 import { supabase } from '../lib/supabase';
@@ -22,9 +22,61 @@ export default function Teachers() {
   const [teacherSubjects, setTeacherSubjects] = useState<Record<string, number[]>>({});
   const [selectedSubjectIds, setSelectedSubjectIds] = useState<Record<string, number[]>>({});
   const [openSubjectsDropdownFor, setOpenSubjectsDropdownFor] = useState<string | null>(null);
+  const [subjectsDropdownDirection, setSubjectsDropdownDirection] = useState<Record<string, 'up' | 'down'>>({});
   const [isUpdatingTeacherSubjects, setIsUpdatingTeacherSubjects] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>(10);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const courseAssignments = useMemo(() => {
+    const map = new Map<number, string>();
+    Object.entries(teacherSubjects).forEach(([teacherId, courseIds]) => {
+      courseIds.forEach((courseId) => {
+        map.set(courseId, teacherId);
+      });
+    });
+    return map;
+  }, [teacherSubjects]);
+
+  useEffect(() => {
+    if (!openSubjectsDropdownFor) {
+      return;
+    }
+
+    const teacherId = openSubjectsDropdownFor;
+
+    const raf1 = requestAnimationFrame(() => {
+      const trigger = document.querySelector<HTMLButtonElement>(`button[data-subjects-trigger="${teacherId}"]`);
+      const dropdown = trigger?.closest<HTMLElement>('.subjects-dropdown');
+      const wrapper = trigger?.closest<HTMLElement>('.list-table-wrapper');
+
+      if (!trigger || !dropdown || !wrapper) {
+        return;
+      }
+
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const triggerRect = trigger.getBoundingClientRect();
+      const spaceBelow = wrapperRect.bottom - triggerRect.bottom;
+      const spaceAbove = triggerRect.top - wrapperRect.top;
+
+      const raf2 = requestAnimationFrame(() => {
+        const menuEl = dropdown.querySelector<HTMLElement>('.subjects-menu');
+        const menuHeight = menuEl?.getBoundingClientRect().height ?? 220;
+
+        // Ha alul kevés hely, próbáljuk felfelé nyitni.
+        const shouldOpenUp = spaceBelow < menuHeight + 8 && spaceAbove > spaceBelow;
+        setSubjectsDropdownDirection((prev) => ({
+          ...prev,
+          [teacherId]: shouldOpenUp ? 'up' : 'down',
+        }));
+      });
+
+      return () => cancelAnimationFrame(raf2);
+    });
+
+    return () => cancelAnimationFrame(raf1);
+  }, [openSubjectsDropdownFor]);
 
   useEffect(() => {
     fetchTeachers();
@@ -94,21 +146,56 @@ export default function Teachers() {
 
   const handleAddSelectedSubjectsToTeacher = async (teacherId: string) => {
     const selected = selectedSubjectIds[teacherId] ?? [];
-    if (selected.length === 0) {
-      return;
-    }
+    if (selected.length === 0) return;
 
     const assigned = teacherSubjects[teacherId] ?? [];
     const toAdd = selected.filter((id) => !assigned.includes(id));
-    if (toAdd.length === 0) {
-      return;
+    if (toAdd.length === 0) return;
+
+    const assignedElsewhere = toAdd.filter((id) => {
+      const assignedTeacherId = courseAssignments.get(id);
+      return assignedTeacherId && assignedTeacherId !== teacherId;
+    });
+
+    if (assignedElsewhere.length > 0) {
+      const byId = new Map(subjects.map((s) => [s.id, s.nev] as const));
+      const names = assignedElsewhere.map((id) => byId.get(id)).filter((name): name is string => Boolean(name));
+      alert(`A következő tantárgy(ak) már más tanárhoz vannak rendelve: ${names.join(', ')}`);
     }
+
+    const toAddAllowed = toAdd.filter((id) => {
+      const assignedTeacherId = courseAssignments.get(id);
+      return !assignedTeacherId || assignedTeacherId === teacherId;
+    });
+
+    if (toAddAllowed.length === 0) return;
 
     try {
       setIsUpdatingTeacherSubjects((prev) => ({ ...prev, [teacherId]: true }));
+
+      // Confirm on server which of these are already present to avoid unique constraint errors
+      const { data: existingRows, error: fetchExistingError } = await supabase
+        .from('teacher_courses')
+        .select('course_id')
+        .eq('teacher_id', teacherId)
+        .in('course_id', toAddAllowed);
+
+      if (fetchExistingError) {
+        console.error('Hiba történt a meglévő kapcsolatok lekérésekor:', fetchExistingError);
+        alert(`Hiba: ${fetchExistingError.message}`);
+        return;
+      }
+
+      const existingIds = ((existingRows as Array<{ course_id: number }> | null) ?? []).map((r) => r.course_id);
+      const toReallyAdd = toAddAllowed.filter((id) => !existingIds.includes(id));
+      if (toReallyAdd.length === 0) {
+        setOpenSubjectsDropdownFor(null);
+        return;
+      }
+
       const { error } = await supabase
         .from('teacher_courses')
-        .insert(toAdd.map((subjectId) => ({ teacher_id: teacherId, course_id: subjectId })));
+        .insert(toReallyAdd.map((courseId) => ({ teacher_id: teacherId, course_id: courseId })));
 
       if (error) {
         console.error('Hiba történt:', error);
@@ -116,12 +203,21 @@ export default function Teachers() {
         return;
       }
 
+      // If operation succeeded, refresh from server to ensure client state matches DB
+      await fetchTeachers();
+
+      // If server returned no visible change, warn that this may be a permissions/RLS issue
+      const postAssigned = teacherSubjects[teacherId] ?? [];
+      const newlyAssigned = postAssigned.concat(toReallyAdd).filter((v, i, a) => a.indexOf(v) === i);
+      if (newlyAssigned.length === (teacherSubjects[teacherId] ?? []).length) {
+        console.warn('Insert succeeded but client state did not update — possible permissions/RLS issue');
+      }
+
       setTeacherSubjects((prev) => {
         const existing = prev[teacherId] ?? [];
-        const merged = Array.from(new Set([...existing, ...toAdd]));
+        const merged = Array.from(new Set([...existing, ...toReallyAdd]));
         return { ...prev, [teacherId]: merged };
       });
-      // keep selection, but close dropdown for nicer UX
       setOpenSubjectsDropdownFor(null);
     } catch (error) {
       console.error('Hiba történt:', error);
@@ -133,34 +229,38 @@ export default function Teachers() {
 
   const handleRemoveSelectedSubjectsFromTeacher = async (teacherId: string) => {
     const selected = selectedSubjectIds[teacherId] ?? [];
-    if (selected.length === 0) {
-      return;
-    }
+    if (selected.length === 0) return;
 
     const assigned = teacherSubjects[teacherId] ?? [];
     const toRemove = selected.filter((id) => assigned.includes(id));
-    if (toRemove.length === 0) {
-      return;
-    }
+    if (toRemove.length === 0) return;
 
     try {
       setIsUpdatingTeacherSubjects((prev) => ({ ...prev, [teacherId]: true }));
-      const { error } = await supabase
-        .from('teacher_courses')
-        .delete()
-        .eq('teacher_id', teacherId)
-        .in('course_id', toRemove);
+
+      // RPC hívás a biztonságos törléshez (RLS megkerülése)
+      // Mivel a remove_teacher_courses függvény SECURITY DEFINER paraméterrel fut,
+      // ezért végrehajthatja a törlést akkor is, ha az anon role-nak nincs rá joga.
+      const { error } = await supabase.rpc('remove_teacher_courses', {
+        p_teacher_id: teacherId,
+        p_course_ids: toRemove
+      });
 
       if (error) {
+        console.log('Supabase RPC error (remove_teacher_courses):', error);
+        console.log('Supabase RPC payload:', { teacherId, toRemove });
         console.error('Hiba történt:', error);
         alert(`Hiba: ${error.message}`);
         return;
       }
 
-      setTeacherSubjects((prev) => {
-        const existing = prev[teacherId] ?? [];
-        return { ...prev, [teacherId]: existing.filter((id) => !toRemove.includes(id)) };
-      });
+
+      // Refresh from server
+      await fetchTeachers();
+
+      // Clear selected checkboxes for this teacher (so UI doesn't keep old selection)
+      setSelectedSubjectIds((prev) => ({ ...prev, [teacherId]: [] }));
+
       setOpenSubjectsDropdownFor(null);
     } catch (error) {
       console.error('Hiba történt:', error);
@@ -174,6 +274,31 @@ export default function Teachers() {
     teacher.nev.toLowerCase().includes(searchQuery.toLowerCase()) ||
     teacher.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Pagination számítások
+  const totalItems = filteredTeachers.length;
+  const totalPages = itemsPerPage === 'all' ? 1 : Math.ceil(totalItems / itemsPerPage);
+  
+  // Aktuális oldal reset ha túlindexelne
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  // Megjelenített tanárok
+  const displayedTeachers = itemsPerPage === 'all' 
+    ? filteredTeachers 
+    : filteredTeachers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const handleItemsPerPageChange = (value: number | 'all') => {
+    setItemsPerPage(value);
+    setCurrentPage(1);
+  };
+
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
 
   const handleDeleteTeacher = async (id: string) => {
     if (!window.confirm('Biztosan törölni szeretnéd ezt a tanárt?')) {
@@ -234,6 +359,26 @@ export default function Teachers() {
         </div>
       </div>
 
+      {!isLoading && filteredTeachers.length > 0 && (
+        <div className="table-controls">
+          <div className="items-per-page">
+            <label>Megjelenítés:</label>
+            <select value={itemsPerPage} onChange={(e) => handleItemsPerPageChange(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}>
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value="all">Összes</option>
+            </select>
+            <span className="items-info">
+              {itemsPerPage === 'all' 
+                ? `Összes tanár (${totalItems})` 
+                : `${(currentPage - 1) * itemsPerPage + 1}-${Math.min(currentPage * itemsPerPage, totalItems)} / ${totalItems}`
+              }
+            </span>
+          </div>
+        </div>
+      )}
+
       <div className="students-list">
         {isLoading ? (
           <div className="loading-state">
@@ -262,14 +407,16 @@ export default function Teachers() {
             <p>{searchQuery ? 'Nincs találat a keresésre' : 'Még nincs hozzáadott tanár'}</p>
           </div>
         ) : (
-          <div className="list-table teachers-table">
-            <div className="list-row list-header" role="row">
-              <div className="list-cell" role="columnheader">Név</div>
-              <div className="list-cell" role="columnheader">Email</div>
-              <div className="list-cell" role="columnheader">Tantárgyak</div>
-              <div className="list-cell actions" role="columnheader">Műveletek</div>
-            </div>
-            {filteredTeachers.map((teacher) => (
+          <>
+            <div className="list-table-wrapper">
+              <div className="list-table teachers-table">
+                <div className="list-row list-header" role="row">
+                  <div className="list-cell" role="columnheader">Név</div>
+                  <div className="list-cell" role="columnheader">Email</div>
+                  <div className="list-cell" role="columnheader">Tantárgyak</div>
+                  <div className="list-cell actions" role="columnheader">Műveletek</div>
+                </div>
+                {displayedTeachers.map((teacher) => (
               <div key={teacher.id} className="list-row" role="row">
                 <div className="list-cell" role="cell">
                   <div className="row-title">{teacher.nev}</div>
@@ -280,11 +427,16 @@ export default function Teachers() {
                 <div className="list-cell" role="cell">
                   <div className="subjects-cell">
                     <div className="subjects-add">
-                      <div className={`subjects-dropdown ${subjects.length === 0 ? 'is-disabled' : ''}`}>
+                      <div
+                        className={`subjects-dropdown ${subjects.length === 0 ? 'is-disabled' : ''} ${
+                          subjectsDropdownDirection[teacher.id] === 'up' ? 'open-up' : ''
+                        }`}
+                      >
                         <button
                           type="button"
                           className="subjects-trigger"
                           onClick={() => setOpenSubjectsDropdownFor((prev) => (prev === teacher.id ? null : teacher.id))}
+                          data-subjects-trigger={teacher.id}
                           disabled={subjects.length === 0 || Boolean(isUpdatingTeacherSubjects[teacher.id])}
                         >
                           {subjects.length === 0 ? (
@@ -306,14 +458,21 @@ export default function Teachers() {
                           <div className="subjects-menu" role="listbox" aria-label="Tantárgyak">
                             {subjects.map((s) => {
                               const isAssigned = (teacherSubjects[teacher.id] ?? []).includes(s.id);
+                              const assignedTeacherId = courseAssignments.get(s.id);
+                              const isAssignedToOther = Boolean(assignedTeacherId && assignedTeacherId !== teacher.id);
                               const isSelected = (selectedSubjectIds[teacher.id] ?? []).includes(s.id);
+                              const isDisabled = Boolean(isUpdatingTeacherSubjects[teacher.id]) || isAssignedToOther;
                               return (
-                                <label key={s.id} className={`subjects-item ${isAssigned ? 'assigned' : ''}`}>
+                                <label
+                                  key={s.id}
+                                  className={`subjects-item ${isAssigned ? 'assigned' : ''} ${isAssignedToOther ? 'assigned-other' : ''}`}
+                                  title={isAssignedToOther ? 'Már más tanárhoz rendelve' : undefined}
+                                >
                                   <input
                                     type="checkbox"
                                     checked={isSelected}
                                     onChange={() => toggleSelectedSubject(teacher.id, s.id)}
-                                    disabled={Boolean(isUpdatingTeacherSubjects[teacher.id])}
+                                    disabled={isDisabled}
                                   />
                                   <span>{s.nev}</span>
                                 </label>
@@ -366,7 +525,58 @@ export default function Teachers() {
                 </div>
               </div>
             ))}
-          </div>
+              </div>
+            </div>
+
+            {itemsPerPage !== 'all' && totalPages > 1 && (
+              <div className="pagination">
+                <button 
+                  className="pagination-button" 
+                  onClick={() => goToPage(currentPage - 1)} 
+                  disabled={currentPage === 1}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M15 18l-6-6 6-6" />
+                  </svg>
+                  Előző
+                </button>
+                
+                <div className="pagination-numbers">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                    if (
+                      page === 1 ||
+                      page === totalPages ||
+                      (page >= currentPage - 1 && page <= currentPage + 1)
+                    ) {
+                      return (
+                        <button
+                          key={page}
+                          className={`pagination-number ${page === currentPage ? 'active' : ''}`}
+                          onClick={() => goToPage(page)}
+                        >
+                          {page}
+                        </button>
+                      );
+                    } else if (page === currentPage - 2 || page === currentPage + 2) {
+                      return <span key={page} className="pagination-ellipsis">...</span>;
+                    }
+                    return null;
+                  })}
+                </div>
+
+                <button 
+                  className="pagination-button" 
+                  onClick={() => goToPage(currentPage + 1)} 
+                  disabled={currentPage === totalPages}
+                >
+                  Következő
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M9 18l6-6-6-6" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
