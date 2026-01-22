@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { StyleSheet, TouchableOpacity, Text, Alert, Platform, PermissionsAndroid, Modal, View, Animated } from 'react-native';
-import * as IntentLauncher from 'expo-intent-launcher';
 import BleAdvertiser from '@/modules/ble-advertiser';
 import { supabase } from '@/lib/supabase';
 
@@ -43,7 +42,9 @@ export default function StudentIndex() {
         advertisingTimeoutRef.current = null;
       }
       // Stop advertising on unmount
-      if (isAdvertising && BleAdvertiser) {
+      // We don't check isAdvertising here because the closure captures the initial value (false)
+      // So we just attempt to stop it to be safe.
+      if (BleAdvertiser) {
         BleAdvertiser.stopAdvertising().catch((error: any) => {
           console.error('Error stopping advertising on unmount:', error);
         });
