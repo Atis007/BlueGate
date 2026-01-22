@@ -9,7 +9,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider, useAuth } from '@/hooks/use-auth';
 
 export const unstable_settings = {
-  anchor: '(tabs)',
+  anchor: 'login',
 };
 
 function RootLayoutNav() {
@@ -24,7 +24,6 @@ function RootLayoutNav() {
     if (status === 'loading') return;
 
     const inAuthGroup = segments[0] === 'login';
-    const inStudentArea = segments[0] === 'student';
     const isAuthenticated = status === 'authenticated' && studentProfile !== null;
 
     console.log('Is authenticated:', isAuthenticated, 'In auth group:', inAuthGroup);

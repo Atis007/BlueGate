@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Courses Tábla Teszt</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 30px;
+            border-radius: 10px;
+        }
+        h1 {
+            color: #00d9ff;
+        }
+        button {
+            background: #00d9ff;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #00b8d9;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #1a1a1a;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .error {
+            color: #ff4444;
+        }
+        .success {
+            color: #44ff44;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Courses Tábla Diagnosztika</h1>
+        <p>Ez a teszt ellenőrzi a Supabase courses és teacher_courses táblákat</p>
+        
+        <button onclick="testCoursesTable()">1. Courses tábla lekérés</button>
+        <button onclick="testTeacherCoursesTable()">2. Teacher_courses tábla lekérés</button>
+        <button onclick="testInsertCourse()">3. Teszt course beszúrás</button>
+        <button onclick="testAll()">🚀 Mindent tesztel</button>
+        
+        <div id="result" class="result">Kattints egy gombra a teszteléshez...</div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+        
+        const supabaseUrl = 'https://ctduljmxejjqhewxwylt.supabase.co'
+        const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN0ZHVsam14ZWpqcWhld3h3eWx0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyNDkwNDYsImV4cCI6MjA3OTgyNTA0Nn0.Hzi-BNlohjtJI6jkDLKiwfWpyQb2KOnZ02DGwmX1USM'
+        
+        const supabase = createClient(supabaseUrl, supabaseAnonKey)
+        
+        window.log = (msg, type = 'info') => {
+            const result = document.getElementById('result')
+            const timestamp = new Date().toLocaleTimeString()
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : ''
+            result.innerHTML += `<span class="${className}">[${timestamp}] ${msg}</span>\n`
+        }
+        
+        window.clearLog = () => {
+            document.getElementById('result').innerHTML = ''
+        }
+        
+        window.testCoursesTable = async () => {
+            clearLog()
+            log('🔍 Courses tábla lekérése...', 'info')
+            
+            try {
+                const { data, error, count } = await supabase
+                    .from('courses')
+                    .select('*', { count: 'exact' })
+                
+                if (error) {
+                    log(`❌ HIBA: ${error.message}`, 'error')
+                    log(`Kód: ${error.code}`, 'error')
+                    log(`Részletek: ${JSON.stringify(error, null, 2)}`, 'error')
+                    return
+                }
+                
+                log(`✅ Sikeres lekérés!`, 'success')
+                log(`📊 Találatok száma: ${count ?? data?.length ?? 0}`, 'success')
+                log(`📦 Adatok: ${JSON.stringify(data, null, 2)}`, 'success')
+                
+            } catch (err) {
+                log(`❌ Kivétel: ${err.message}`, 'error')
+            }
+        }
+        
+        window.testTeacherCoursesTable = async () => {
+            clearLog()
+            log('🔍 Teacher_courses tábla lekérése...', 'info')
+            
+            try {
+                const { data, error, count } = await supabase
+                    .from('teacher_courses')
+                    .select('*', { count: 'exact' })
+                
+                if (error) {
+                    log(`❌ HIBA: ${error.message}`, 'error')
+                    log(`Kód: ${error.code}`, 'error')
+                    log(`Részletek: ${JSON.stringify(error, null, 2)}`, 'error')
+                    return
+                }
+                
+                log(`✅ Sikeres lekérés!`, 'success')
+                log(`📊 Találatok száma: ${count ?? data?.length ?? 0}`, 'success')
+                log(`📦 Adatok: ${JSON.stringify(data, null, 2)}`, 'success')
+                
+            } catch (err) {
+                log(`❌ Kivétel: ${err.message}`, 'error')
+            }
+        }
+        
+        window.testInsertCourse = async () => {
+            clearLog()
+            const testName = `Teszt Tárgy ${Date.now()}`
+            log(`📝 Teszt course beszúrása: "${testName}"...`, 'info')
+            
+            try {
+                const { data, error } = await supabase
+                    .from('courses')
+                    .insert([{ nev: testName }])
+                    .select()
+                
+                if (error) {
+                    log(`❌ HIBA: ${error.message}`, 'error')
+                    log(`Kód: ${error.code}`, 'error')
+                    log(`Részletek: ${JSON.stringify(error, null, 2)}`, 'error')
+                    return
+                }
+                
+                log(`✅ Sikeres beszúrás!`, 'success')
+                log(`📦 Beszúrt adat: ${JSON.stringify(data, null, 2)}`, 'success')
+                
+            } catch (err) {
+                log(`❌ Kivétel: ${err.message}`, 'error')
+            }
+        }
+        
+        window.testAll = async () => {
+            clearLog()
+            log('🚀 Összes teszt futtatása...\n', 'info')
+            
+            await testCoursesTable()
+            log('\n---\n', 'info')
+            await testTeacherCoursesTable()
+        }
+    </script>
+</body>
+</html>
