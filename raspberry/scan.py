@@ -417,6 +417,19 @@ def detection_callback(device, advertisement_data):
     print()
 
 
+def input_listener(stop_event, loop):
+    """
+    Külön szálon fut: figyeli, hogy a felhasználó beírja-e a 'q'-t.
+    """
+    print(">>> Nyomj 'q'-t és ENTER-t a leállítás kéréséhez...")
+    while True:
+        user_input = input()
+        if user_input.strip().lower() == 'q':
+            print("[STOP] Leállítás kezdeményezése...")
+            # Jelezzük az aszinkron loopnak, hogy vége
+            loop.call_soon_threadsafe(stop_event.set)
+            break
+
 async def scan_once():
     # Induláskor offline mappa ellenőrzése és szinkron indítása
     check_offline_folder_on_startup()
@@ -436,11 +449,24 @@ async def scan_once():
     print(f"Scan idő: {SCAN_INTERVAL} mp")
     print(f"Keresett Service UUID: {APP_SERVICE_UUID}\n")
 
+    # Esemény és Loop lekérése
+    stop_event = asyncio.Event()
+    loop = asyncio.get_running_loop()
+
+    # Input figyelő szál indítása
+    # Daemon=True, hogy a program kilépésekor ez is leálljon
+    input_thread = threading.Thread(target=input_listener, args=(stop_event, loop), daemon=True)
+    input_thread.start()
+
     async with BleakScanner(
         detection_callback,
         service_uuids=[APP_SERVICE_UUID]
     ):
-        await asyncio.sleep(SCAN_INTERVAL)
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=SCAN_INTERVAL)
+            print("\n[INFO] Scan megszakítva felhasználói kérésre.")
+        except asyncio.TimeoutError:
+            print("\n[INFO] Scan idő lejárt (normál leállás).")
 
     print("\n-----------------------------")
     print("Scan sikeresen lefutott.")
