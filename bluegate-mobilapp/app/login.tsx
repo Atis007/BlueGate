@@ -41,6 +41,7 @@ export default function LoginScreen() {
       }
       // Navigation is handled by _layout.tsx based on auth status
     } catch (error) {
+      console.error(error);
       Alert.alert('Hiba', 'Váratlan hiba történt. Kérjük, próbálja újra.');
     } finally {
       setIsLoading(false);
