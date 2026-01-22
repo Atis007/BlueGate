@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import './Students.css';
 import { supabase } from '../lib/supabase';
@@ -28,6 +28,16 @@ export default function Teachers() {
   const [isLoading, setIsLoading] = useState(true);
   const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>(10);
   const [currentPage, setCurrentPage] = useState(1);
+
+  const courseAssignments = useMemo(() => {
+    const map = new Map<number, string>();
+    Object.entries(teacherSubjects).forEach(([teacherId, courseIds]) => {
+      courseIds.forEach((courseId) => {
+        map.set(courseId, teacherId);
+      });
+    });
+    return map;
+  }, [teacherSubjects]);
 
   useEffect(() => {
     if (!openSubjectsDropdownFor) {
@@ -142,6 +152,24 @@ export default function Teachers() {
     const toAdd = selected.filter((id) => !assigned.includes(id));
     if (toAdd.length === 0) return;
 
+    const assignedElsewhere = toAdd.filter((id) => {
+      const assignedTeacherId = courseAssignments.get(id);
+      return assignedTeacherId && assignedTeacherId !== teacherId;
+    });
+
+    if (assignedElsewhere.length > 0) {
+      const byId = new Map(subjects.map((s) => [s.id, s.nev] as const));
+      const names = assignedElsewhere.map((id) => byId.get(id)).filter((name): name is string => Boolean(name));
+      alert(`A következő tantárgy(ak) már más tanárhoz vannak rendelve: ${names.join(', ')}`);
+    }
+
+    const toAddAllowed = toAdd.filter((id) => {
+      const assignedTeacherId = courseAssignments.get(id);
+      return !assignedTeacherId || assignedTeacherId === teacherId;
+    });
+
+    if (toAddAllowed.length === 0) return;
+
     try {
       setIsUpdatingTeacherSubjects((prev) => ({ ...prev, [teacherId]: true }));
 
@@ -150,7 +178,7 @@ export default function Teachers() {
         .from('teacher_courses')
         .select('course_id')
         .eq('teacher_id', teacherId)
-        .in('course_id', toAdd);
+        .in('course_id', toAddAllowed);
 
       if (fetchExistingError) {
         console.error('Hiba történt a meglévő kapcsolatok lekérésekor:', fetchExistingError);
@@ -159,7 +187,7 @@ export default function Teachers() {
       }
 
       const existingIds = ((existingRows as Array<{ course_id: number }> | null) ?? []).map((r) => r.course_id);
-      const toReallyAdd = toAdd.filter((id) => !existingIds.includes(id));
+      const toReallyAdd = toAddAllowed.filter((id) => !existingIds.includes(id));
       if (toReallyAdd.length === 0) {
         setOpenSubjectsDropdownFor(null);
         return;
@@ -210,35 +238,29 @@ export default function Teachers() {
     try {
       setIsUpdatingTeacherSubjects((prev) => ({ ...prev, [teacherId]: true }));
 
-      const { data: delData, error } = await supabase
-        .from('teacher_courses')
-        .delete()
-        .eq('teacher_id', teacherId)
-        .in('course_id', toRemove);
+      // RPC hívás a biztonságos törléshez (RLS megkerülése)
+      // Mivel a remove_teacher_courses függvény SECURITY DEFINER paraméterrel fut,
+      // ezért végrehajthatja a törlést akkor is, ha az anon role-nak nincs rá joga.
+      const { error } = await supabase.rpc('remove_teacher_courses', {
+        p_teacher_id: teacherId,
+        p_course_ids: toRemove
+      });
 
       if (error) {
+        console.log('Supabase RPC error (remove_teacher_courses):', error);
+        console.log('Supabase RPC payload:', { teacherId, toRemove });
         console.error('Hiba történt:', error);
         alert(`Hiba: ${error.message}`);
         return;
       }
 
+
       // Refresh from server
       await fetchTeachers();
-
-      // If delete returned empty data, warn and show alert about possible permission/RLS issue
-      const delArray = Array.isArray(delData) ? delData : [];
-      if (!delData || delArray.length === 0) {
-        console.warn('Delete returned no rows — possible permissions/RLS issue', { delData });
-        alert('Törlés nem sikerült: a szerver nem adott vissza törölt sorokat. Ellenőrizd a Supabase RLS/policy beállításokat.');
-      }
 
       // Clear selected checkboxes for this teacher (so UI doesn't keep old selection)
       setSelectedSubjectIds((prev) => ({ ...prev, [teacherId]: [] }));
 
-      setTeacherSubjects((prev) => {
-        const existing = prev[teacherId] ?? [];
-        return { ...prev, [teacherId]: existing.filter((id) => !toRemove.includes(id)) };
-      });
       setOpenSubjectsDropdownFor(null);
     } catch (error) {
       console.error('Hiba történt:', error);
@@ -436,14 +458,21 @@ export default function Teachers() {
                           <div className="subjects-menu" role="listbox" aria-label="Tantárgyak">
                             {subjects.map((s) => {
                               const isAssigned = (teacherSubjects[teacher.id] ?? []).includes(s.id);
+                              const assignedTeacherId = courseAssignments.get(s.id);
+                              const isAssignedToOther = Boolean(assignedTeacherId && assignedTeacherId !== teacher.id);
                               const isSelected = (selectedSubjectIds[teacher.id] ?? []).includes(s.id);
+                              const isDisabled = Boolean(isUpdatingTeacherSubjects[teacher.id]) || isAssignedToOther;
                               return (
-                                <label key={s.id} className={`subjects-item ${isAssigned ? 'assigned' : ''}`}>
+                                <label
+                                  key={s.id}
+                                  className={`subjects-item ${isAssigned ? 'assigned' : ''} ${isAssignedToOther ? 'assigned-other' : ''}`}
+                                  title={isAssignedToOther ? 'Már más tanárhoz rendelve' : undefined}
+                                >
                                   <input
                                     type="checkbox"
                                     checked={isSelected}
                                     onChange={() => toggleSelectedSubject(teacher.id, s.id)}
-                                    disabled={Boolean(isUpdatingTeacherSubjects[teacher.id])}
+                                    disabled={isDisabled}
                                   />
                                   <span>{s.nev}</span>
                                 </label>

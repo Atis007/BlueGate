@@ -330,6 +330,17 @@
   border: 1px solid rgba(0, 217, 255, 0.18);
 }
 
+.subjects-item.assigned-other {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+}
+
+.subjects-item.assigned-other:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
 .subjects-item input {
   width: 16px;
   height: 16px;
