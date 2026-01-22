@@ -136,21 +136,38 @@ export default function Teachers() {
 
   const handleAddSelectedSubjectsToTeacher = async (teacherId: string) => {
     const selected = selectedSubjectIds[teacherId] ?? [];
-    if (selected.length === 0) {
-      return;
-    }
+    if (selected.length === 0) return;
 
     const assigned = teacherSubjects[teacherId] ?? [];
     const toAdd = selected.filter((id) => !assigned.includes(id));
-    if (toAdd.length === 0) {
-      return;
-    }
+    if (toAdd.length === 0) return;
 
     try {
       setIsUpdatingTeacherSubjects((prev) => ({ ...prev, [teacherId]: true }));
+
+      // Confirm on server which of these are already present to avoid unique constraint errors
+      const { data: existingRows, error: fetchExistingError } = await supabase
+        .from('teacher_courses')
+        .select('course_id')
+        .eq('teacher_id', teacherId)
+        .in('course_id', toAdd);
+
+      if (fetchExistingError) {
+        console.error('Hiba történt a meglévő kapcsolatok lekérésekor:', fetchExistingError);
+        alert(`Hiba: ${fetchExistingError.message}`);
+        return;
+      }
+
+      const existingIds = ((existingRows as Array<{ course_id: number }> | null) ?? []).map((r) => r.course_id);
+      const toReallyAdd = toAdd.filter((id) => !existingIds.includes(id));
+      if (toReallyAdd.length === 0) {
+        setOpenSubjectsDropdownFor(null);
+        return;
+      }
+
       const { error } = await supabase
         .from('teacher_courses')
-        .insert(toAdd.map((subjectId) => ({ teacher_id: teacherId, course_id: subjectId })));
+        .insert(toReallyAdd.map((courseId) => ({ teacher_id: teacherId, course_id: courseId })));
 
       if (error) {
         console.error('Hiba történt:', error);
@@ -158,12 +175,21 @@ export default function Teachers() {
         return;
       }
 
+      // If operation succeeded, refresh from server to ensure client state matches DB
+      await fetchTeachers();
+
+      // If server returned no visible change, warn that this may be a permissions/RLS issue
+      const postAssigned = teacherSubjects[teacherId] ?? [];
+      const newlyAssigned = postAssigned.concat(toReallyAdd).filter((v, i, a) => a.indexOf(v) === i);
+      if (newlyAssigned.length === (teacherSubjects[teacherId] ?? []).length) {
+        console.warn('Insert succeeded but client state did not update — possible permissions/RLS issue');
+      }
+
       setTeacherSubjects((prev) => {
         const existing = prev[teacherId] ?? [];
-        const merged = Array.from(new Set([...existing, ...toAdd]));
+        const merged = Array.from(new Set([...existing, ...toReallyAdd]));
         return { ...prev, [teacherId]: merged };
       });
-      // keep selection, but close dropdown for nicer UX
       setOpenSubjectsDropdownFor(null);
     } catch (error) {
       console.error('Hiba történt:', error);
@@ -175,19 +201,16 @@ export default function Teachers() {
 
   const handleRemoveSelectedSubjectsFromTeacher = async (teacherId: string) => {
     const selected = selectedSubjectIds[teacherId] ?? [];
-    if (selected.length === 0) {
-      return;
-    }
+    if (selected.length === 0) return;
 
     const assigned = teacherSubjects[teacherId] ?? [];
     const toRemove = selected.filter((id) => assigned.includes(id));
-    if (toRemove.length === 0) {
-      return;
-    }
+    if (toRemove.length === 0) return;
 
     try {
       setIsUpdatingTeacherSubjects((prev) => ({ ...prev, [teacherId]: true }));
-      const { error } = await supabase
+
+      const { data: delData, error } = await supabase
         .from('teacher_courses')
         .delete()
         .eq('teacher_id', teacherId)
@@ -198,6 +221,19 @@ export default function Teachers() {
         alert(`Hiba: ${error.message}`);
         return;
       }
+
+      // Refresh from server
+      await fetchTeachers();
+
+      // If delete returned empty data, warn and show alert about possible permission/RLS issue
+      const delArray = Array.isArray(delData) ? delData : [];
+      if (!delData || delArray.length === 0) {
+        console.warn('Delete returned no rows — possible permissions/RLS issue', { delData });
+        alert('Törlés nem sikerült: a szerver nem adott vissza törölt sorokat. Ellenőrizd a Supabase RLS/policy beállításokat.');
+      }
+
+      // Clear selected checkboxes for this teacher (so UI doesn't keep old selection)
+      setSelectedSubjectIds((prev) => ({ ...prev, [teacherId]: [] }));
 
       setTeacherSubjects((prev) => {
         const existing = prev[teacherId] ?? [];
