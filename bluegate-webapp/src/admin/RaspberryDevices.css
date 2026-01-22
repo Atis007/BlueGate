@@ -10,6 +10,11 @@
   margin-bottom: 2.5rem;
 }
 
+.header-controls {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .raspberry-header h1 {
   font-size: 2rem;
   font-weight: 500;
@@ -19,10 +24,38 @@
   letter-spacing: 0.5px;
 }
 
-.header-controls {
-  display: flex;
-  justify-content: flex-end;
-  gap: 1.5rem;
+.add-button {
+  padding: 0.85rem 2rem;
+  background: linear-gradient(135deg, #00d9ff 0%, #00b8d4 100%);
+  color: #0a1929;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  box-shadow: 0 4px 15px rgba(0, 217, 255, 0.3);
+  transition: all 0.3s ease;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.add-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 217, 255, 0.4);
+}
+
+.add-button:active {
+  transform: translateY(0);
+}
+
+.add-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
 .raspberry-table-container {
@@ -76,4 +109,135 @@
 .status-inactive {
   color: #f87171;
   font-weight: 600;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(7, 18, 30, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1.5rem;
+  z-index: 1000;
+}
+
+.modal-card {
+  width: min(520px, 100%);
+  background: linear-gradient(160deg, #132f4c 0%, #0e233a 100%);
+  border-radius: 16px;
+  border: 1px solid #1e3a52;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+  padding: 1.75rem;
+  color: #ffffff;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.modal-header h2 {
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+.modal-close {
+  background: transparent;
+  border: none;
+  color: #90a4ae;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.modal-close:hover {
+  color: #ffffff;
+}
+
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-field label {
+  color: #bcd7e1;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.form-field input,
+.form-field select {
+  background-color: #0b2236;
+  border: 1px solid #1e3a52;
+  border-radius: 10px;
+  padding: 0.8rem 0.9rem;
+  color: #ffffff;
+  font-size: 0.95rem;
+  transition: border 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-field input:focus,
+.form-field select:focus {
+  outline: none;
+  border-color: #00d9ff;
+  box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.12);
+}
+
+.error-text {
+  color: #f87171;
+  font-size: 0.85rem;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.modal-primary {
+  padding: 0.75rem 1.8rem;
+  background: linear-gradient(135deg, #00d9ff 0%, #00b8d4 100%);
+  color: #0a1929;
+  border-radius: 10px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.modal-primary:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.modal-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 15px rgba(0, 217, 255, 0.35);
+}
+
+.modal-secondary {
+  padding: 0.75rem 1.6rem;
+  background: transparent;
+  color: #bcd7e1;
+  border-radius: 10px;
+  border: 1px solid #2a4a63;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border 0.2s ease, color 0.2s ease;
+}
+
+.modal-secondary:hover {
+  color: #ffffff;
+  border-color: #3b5f7b;
 }
