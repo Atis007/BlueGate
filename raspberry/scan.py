@@ -160,6 +160,33 @@ def get_student_id_by_indexszam(indexszam: str) -> int | None:
         return None
 
 
+def attendance_exists(diak_id: int, course_id: int) -> bool:
+    """
+    Ellenőrzi, hogy a diák már rögzítve van-e erre az órára.
+    """
+    url = f"{SUPABASE_URL}/rest/v1/attendance"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}"
+    }
+    params = {
+        "diak_id": f"eq.{diak_id}",
+        "course_id": f"eq.{course_id}",
+        "select": "id",
+        "limit": 1
+    }
+    
+    try:
+        r = httpx.get(url, headers=headers, params=params, timeout=10)
+        if r.status_code == 200:
+            data = r.json()
+            return len(data) > 0
+        return False
+    except Exception as e:
+        print(f"[ERROR] Jelenlét ellenőrzési hiba: {e}")
+        return False
+
+
 # ============================================
 # Offline mentés és későbbi szinkron logika
 # ============================================
@@ -403,7 +430,12 @@ def insert_attendance(student_indexszam: str, rssi: int) -> None:
         print(f"  → [ERROR] Nem található diák ID az indexszámhoz: {student_indexszam}")
         return
 
-    # 3. Payload összeállítása a pontos sémával
+    # 3. Ellenőrizzük, hogy már rögzítve van-e erre az órára
+    if attendance_exists(diak_id, course_id):
+        print(f"  → [INFO] Diák már rögzítve erre az órára: {student_indexszam}")
+        return
+
+    # 4. Payload összeállítása a pontos sémával
     url = f"{SUPABASE_URL}/rest/v1/attendance"
     headers = {
         "apikey": SUPABASE_KEY,
