@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './Students.css';
 import './Logs.css';
 import { supabase } from '../lib/supabase';
@@ -17,6 +18,7 @@ interface LogEntry {
 type LogCategory = 'teacher_login' | null;
 
 export default function Logs() {
+  const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<LogCategory>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -67,6 +69,33 @@ export default function Logs() {
             </div>
             <h2>Tanár bejelentkezés</h2>
             <p>Tanári bejelentkezési kísérletek (sikeres és sikertelen) listázása.</p>
+          </div>
+
+          <div className="log-card" onClick={() => navigate('/admin/sync-logs')}>
+            <div style={{ marginBottom: '1rem', color: '#00d9ff' }}>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M4 4v6h6" />
+                <path d="M20 20v-6h-6" />
+                <path d="M5 19a9 9 0 0 1 14-14" />
+              </svg>
+            </div>
+            <h2>Sync logok</h2>
+            <p>Szinkronizálási folyamatok naplóinak megjelenítése.</p>
+          </div>
+
+          <div className="log-card" onClick={() => navigate('/admin/attendance-logs')}>
+            <div style={{ marginBottom: '1rem', color: '#00d9ff' }}>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M8 2v4" />
+                <path d="M16 2v4" />
+                <rect x="3" y="4" width="18" height="18" rx="2" />
+                <path d="M3 10h18" />
+                <path d="M7 14h4" />
+                <path d="M7 18h6" />
+              </svg>
+            </div>
+            <h2>Jelenlét napló</h2>
+            <p>Jelenléti bejegyzések listázása tantárgy és diák bontásban.</p>
           </div>
           
           {/* További kártyák helye */}
