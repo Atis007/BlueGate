@@ -31,7 +31,7 @@ type AdminRow = {
 }
 
 type TeacherRow = {
-  id: number
+  id: any // Changed to any to support both number/string, but likely string (uuid)
   nev: string | null
   email: string
   jelszo: string
@@ -202,6 +202,17 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
         console.warn(
           'Biztonsági figyelmeztetés: a teacher tábla jelszava nincs bcrypt-tel titkosítva. Javasolt a hash-elt tárolás.',
         )
+      }
+
+      try {
+        await supabase.from('teacher_login_logs').insert({
+          teacher_id: teacherData.id,
+          success: !!passwordMatches,
+          logged_at: new Date().toISOString(),
+          error_message: passwordMatches ? null : 'Hibás jelszó'
+        });
+      } catch (logError) {
+        console.error('Failed to log login attempt', logError);
       }
 
       if (!passwordMatches) {

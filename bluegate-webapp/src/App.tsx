@@ -5,6 +5,7 @@ import './App.css'
 import Students from './admin/Students'
 import AddStudent from './admin/AddStudent'
 import EditStudent from './admin/EditStudent'
+import Logs from './admin/Logs'
 import Teachers from './admin/Teachers'
 import AddTeacher from './admin/AddTeacher'
 import EditTeacher from './admin/EditTeacher'
@@ -34,6 +35,7 @@ function Header() {
         { to: '/admin/students', label: 'Diákok' },
         { to: '/admin/teachers', label: 'Tanárok' },
         { to: '/admin/raspberry-devices', label: 'Raspberry eszközök' },
+        { to: '/admin/logs', label: 'Naplóbejegyzés' },
       ]
     }
 
@@ -257,6 +259,9 @@ function App() {
           <Route path="/admin/edit-teacher/:id" element={<ProtectedRoute allowedRoles="admin"><EditTeacher /></ProtectedRoute>} />
           <Route path="/admin/raspberry-devices" element={<ProtectedRoute allowedRoles="admin"><RaspberryDevices /></ProtectedRoute>} />
           
+          
+          <Route path="/admin/logs" element={<ProtectedRoute allowedRoles="admin"><Logs /></ProtectedRoute>} />
+
           {/* Teacher only routes */}
           <Route path="/teacher/dashboard" element={<ProtectedRoute allowedRoles="teacher"><TeacherDashboard /></ProtectedRoute>} />
           <Route path="/teacher/course/:courseId" element={<ProtectedRoute allowedRoles="teacher"><CourseAttendance /></ProtectedRoute>} />
