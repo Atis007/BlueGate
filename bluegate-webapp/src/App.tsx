@@ -34,7 +34,6 @@ function Header() {
       return [
         { to: '/admin/students', label: 'Diákok' },
         { to: '/admin/teachers', label: 'Tanárok' },
-        { to: '/admin/raspberry-devices', label: 'Raspberry eszközök' },
         { to: '/admin/logs', label: 'Naplóbejegyzés' },
       ]
     }
@@ -257,8 +256,6 @@ function App() {
           <Route path="/admin/teachers" element={<ProtectedRoute allowedRoles="admin"><Teachers /></ProtectedRoute>} />
           <Route path="/admin/add-teacher" element={<ProtectedRoute allowedRoles="admin"><AddTeacher /></ProtectedRoute>} />
           <Route path="/admin/edit-teacher/:id" element={<ProtectedRoute allowedRoles="admin"><EditTeacher /></ProtectedRoute>} />
-          <Route path="/admin/raspberry-devices" element={<ProtectedRoute allowedRoles="admin"><RaspberryDevices /></ProtectedRoute>} />
-          
           
           <Route path="/admin/logs" element={<ProtectedRoute allowedRoles="admin"><Logs /></ProtectedRoute>} />
 
