@@ -11,7 +11,68 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  margin-bottom: 2.5rem;
+  margin-bottom: 2rem;
+}
+
+.attendance-filters {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  margin-bottom: 2.75rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: 18px;
+  border: 1px solid rgba(0, 217, 255, 0.2);
+  background: linear-gradient(140deg, rgba(19, 47, 76, 0.88), rgba(13, 28, 46, 0.95));
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
+}
+
+.attendance-filter-label {
+  font-size: 0.75rem;
+  color: #b3e5ff;
+  text-transform: uppercase;
+  letter-spacing: 0.12rem;
+  font-weight: 600;
+}
+
+.attendance-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 220px;
+}
+
+.attendance-filter-input {
+  min-width: 220px;
+  padding: 0.7rem 0.95rem;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 217, 255, 0.35);
+  background-color: rgba(10, 25, 41, 0.85);
+  color: #ffffff;
+  font-size: 0.95rem;
+}
+
+.attendance-filter-input:focus {
+  outline: none;
+  border-color: #00d9ff;
+  box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.15);
+}
+
+.attendance-filter-button {
+  padding: 0.7rem 1.8rem;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, #00d9ff, #00b8d4);
+  color: #0a1929;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  letter-spacing: 0.02em;
+}
+
+.attendance-filter-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 217, 255, 0.3);
 }
 
 .attendance-eyebrow {
@@ -57,15 +118,15 @@
 .attendance-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1.25rem;
+  gap: 1.5rem;
 }
 
 .attendance-card {
   background: linear-gradient(160deg, rgba(19, 47, 76, 0.95), rgba(14, 33, 54, 0.95));
   border-radius: 16px;
   border: 1px solid rgba(0, 217, 255, 0.2);
-  padding: 1.25rem;
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+  padding: 1.4rem;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.2);
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -130,6 +191,20 @@
   .attendance-grid {
     grid-template-columns: 1fr;
   }
+
+  .attendance-filters {
+    align-items: stretch;
+    padding: 1.1rem;
+  }
+
+  .attendance-filter-input,
+  .attendance-filter-button {
+    width: 100%;
+  }
+
+  .attendance-filter-group {
+    width: 100%;
+  }
 }
 
 @media (max-width: 480px) {
@@ -139,5 +214,9 @@
 
   .attendance-card {
     padding: 1rem;
+  }
+
+  .attendance-filters {
+    margin-bottom: 2rem;
   }
 }

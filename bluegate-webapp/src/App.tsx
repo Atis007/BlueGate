@@ -6,10 +6,11 @@ import Students from './admin/Students'
 import AddStudent from './admin/AddStudent'
 import EditStudent from './admin/EditStudent'
 import Logs from './admin/Logs'
+import SyncLogs from './admin/SyncLogs'
+import AttendanceLogs from './admin/AttendanceLogs'
 import Teachers from './admin/Teachers'
 import AddTeacher from './admin/AddTeacher'
 import EditTeacher from './admin/EditTeacher'
-import RaspberryDevices from './admin/RaspberryDevices'
 import TeacherDashboard from './teacher/Dashboard'
 import CourseAttendance from './teacher/CourseAttendance'
 import { SupabaseAuthProvider, useSupabaseSession } from './hooks/useSupabaseSession'
@@ -258,6 +259,8 @@ function App() {
           <Route path="/admin/edit-teacher/:id" element={<ProtectedRoute allowedRoles="admin"><EditTeacher /></ProtectedRoute>} />
           
           <Route path="/admin/logs" element={<ProtectedRoute allowedRoles="admin"><Logs /></ProtectedRoute>} />
+          <Route path="/admin/sync-logs" element={<ProtectedRoute allowedRoles="admin"><SyncLogs /></ProtectedRoute>} />
+          <Route path="/admin/attendance-logs" element={<ProtectedRoute allowedRoles="admin"><AttendanceLogs /></ProtectedRoute>} />
 
           {/* Teacher only routes */}
           <Route path="/teacher/dashboard" element={<ProtectedRoute allowedRoles="teacher"><TeacherDashboard /></ProtectedRoute>} />
