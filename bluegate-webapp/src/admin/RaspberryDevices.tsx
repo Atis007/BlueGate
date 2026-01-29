@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import './RaspberryDevices.css';
-import { supabase } from '../lib/supabase';
+import { useState, useEffect } from "react";
+import "./RaspberryDevices.css";
+import { supabase } from "../lib/supabase";
 
 interface RaspberryDevice {
   id: number;
@@ -16,7 +16,7 @@ export default function RaspberryDevices() {
   const [isRoomsLoading, setIsRoomsLoading] = useState(true);
   const [roomOptions, setRoomOptions] = useState<string[]>([]);
   const [formData, setFormData] = useState({
-    terem: '',
+    terem: "",
     aktiv: true,
   });
   const [formErrors, setFormErrors] = useState<{ terem?: string }>({});
@@ -42,20 +42,20 @@ export default function RaspberryDevices() {
     setIsLoading(true);
     try {
       const { data, error } = await supabase
-        .from('raspberry_devices')
-        .select('*')
-        .order('id', { ascending: true });
+        .from("raspberry_devices")
+        .select("*")
+        .order("id", { ascending: true });
 
       if (error) {
-        console.error('Hiba történt:', error);
-        alert('Hiba történt az adatok betöltése során');
+        console.error("Hiba történt:", error);
+        alert("Hiba történt az adatok betöltése során");
         return;
       }
 
       setDevices(data || []);
     } catch (error) {
-      console.error('Hiba történt:', error);
-      alert('Hiba történt az adatok betöltése során');
+      console.error("Hiba történt:", error);
+      alert("Hiba történt az adatok betöltése során");
     } finally {
       setIsLoading(false);
     }
@@ -65,31 +65,31 @@ export default function RaspberryDevices() {
     setIsRoomsLoading(true);
 
     try {
-      const { data, error } = await supabase.rpc('get_enum_values', {
-        enum_name: 'terem_enum',
+      const { data, error } = await supabase.rpc("get_enum_values", {
+        enum_name: "terem_enum",
       });
 
       if (error) {
-        console.error('Hiba történt:', error);
-        alert('Hiba történt a terem lista betöltése során');
+        console.error("Hiba történt:", error);
+        alert("Hiba történt a terem lista betöltése során");
         return;
       }
 
       const options = (data || [])
-        .map((item: { value?: string }) => item.value || '')
+        .map((item: { value?: string }) => item.value || "")
         .filter((value: string) => value.trim().length > 0);
 
       setRoomOptions(options);
     } catch (error) {
-      console.error('Hiba történt:', error);
-      alert('Hiba történt a terem lista betöltése során');
+      console.error("Hiba történt:", error);
+      alert("Hiba történt a terem lista betöltése során");
     } finally {
       setIsRoomsLoading(false);
     }
   };
 
   const resetForm = () => {
-    setFormData({ terem: '', aktiv: true });
+    setFormData({ terem: "", aktiv: true });
     setFormErrors({});
   };
 
@@ -112,9 +112,9 @@ export default function RaspberryDevices() {
     const errors: { terem?: string } = {};
 
     if (!formData.terem.trim()) {
-      errors.terem = 'A terem megadása kötelező.';
+      errors.terem = "A terem megadása kötelező.";
     } else if (usedRooms.has(formData.terem)) {
-      errors.terem = 'Ez a terem már hozzá van rendelve.';
+      errors.terem = "Ez a terem már hozzá van rendelve.";
     }
 
     setFormErrors(errors);
@@ -132,7 +132,7 @@ export default function RaspberryDevices() {
 
     try {
       const { error } = await supabase
-        .from('raspberry_devices')
+        .from("raspberry_devices")
         .insert([
           {
             terem: formData.terem.trim(),
@@ -142,7 +142,7 @@ export default function RaspberryDevices() {
         .select();
 
       if (error) {
-        console.error('Hiba történt:', error);
+        console.error("Hiba történt:", error);
         alert(`Hiba: ${error.message}`);
         return;
       }
@@ -150,8 +150,8 @@ export default function RaspberryDevices() {
       await fetchDevices();
       setIsAddModalOpen(false);
     } catch (error) {
-      console.error('Hiba történt:', error);
-      alert('Hiba történt az adatok mentése során');
+      console.error("Hiba történt:", error);
+      alert("Hiba történt az adatok mentése során");
     } finally {
       setIsSubmitting(false);
     }
@@ -166,7 +166,9 @@ export default function RaspberryDevices() {
             type="button"
             className="add-button"
             onClick={openModal}
-            disabled={isRoomsLoading || isLoading || availableRooms.length === 0}
+            disabled={
+              isRoomsLoading || isLoading || availableRooms.length === 0
+            }
           >
             Eszköz hozzáadása
           </button>
@@ -174,7 +176,9 @@ export default function RaspberryDevices() {
       </div>
 
       {isLoading ? (
-        <div style={{ color: 'white', textAlign: 'center', padding: '2rem' }}>Betöltés...</div>
+        <div style={{ color: "white", textAlign: "center", padding: "2rem" }}>
+          Betöltés...
+        </div>
       ) : (
         <div className="raspberry-table-container">
           <div className="list-row list-header">
@@ -182,20 +186,26 @@ export default function RaspberryDevices() {
             <div className="list-cell">Terem</div>
             <div className="list-cell">Státusz</div>
           </div>
-          
+
           {devices.length === 0 ? (
-             <div style={{ padding: '2rem', textAlign: 'center', color: '#fff' }}>
-                Nincsenek eszközök.
-             </div>
+            <div
+              style={{ padding: "2rem", textAlign: "center", color: "#fff" }}
+            >
+              Nincsenek eszközök.
+            </div>
           ) : (
             devices.map((device) => (
               <div key={device.id} className="list-row">
                 <div className="list-cell">#{device.id}</div>
                 <div className="list-cell">{device.terem}</div>
                 <div className="list-cell">
-                   <span className={device.aktiv ? 'status-active' : 'status-inactive'}>
-                      {device.aktiv ? 'Aktív' : 'Inaktív'}
-                   </span>
+                  <span
+                    className={
+                      device.aktiv ? "status-active" : "status-inactive"
+                    }
+                  >
+                    {device.aktiv ? "Aktív" : "Inaktív"}
+                  </span>
                 </div>
               </div>
             ))
@@ -205,10 +215,17 @@ export default function RaspberryDevices() {
 
       {isAddModalOpen && (
         <div className="modal-backdrop" onClick={closeModal}>
-          <div className="modal-card" onClick={(event) => event.stopPropagation()}>
+          <div
+            className="modal-card"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="modal-header">
               <h2>Eszköz hozzáadása</h2>
-              <button type="button" className="modal-close" onClick={closeModal}>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={closeModal}
+              >
                 X
               </button>
             </div>
@@ -219,19 +236,26 @@ export default function RaspberryDevices() {
                   id="terem"
                   value={formData.terem}
                   onChange={(event) => {
-                    setFormData((prev) => ({ ...prev, terem: event.target.value }));
+                    setFormData((prev) => ({
+                      ...prev,
+                      terem: event.target.value,
+                    }));
                     if (formErrors.terem) {
                       setFormErrors({});
                     }
                   }}
-                  disabled={isSubmitting || isRoomsLoading || availableRooms.length === 0}
+                  disabled={
+                    isSubmitting ||
+                    isRoomsLoading ||
+                    availableRooms.length === 0
+                  }
                 >
                   <option value="">
                     {isRoomsLoading
-                      ? 'Betöltés...'
+                      ? "Betöltés..."
                       : availableRooms.length === 0
-                      ? 'Nincs szabad terem'
-                      : 'Válassz termet'}
+                        ? "Nincs szabad terem"
+                        : "Válassz termet"}
                   </option>
                   {availableRooms.map((option) => (
                     <option key={option} value={option}>
@@ -239,15 +263,20 @@ export default function RaspberryDevices() {
                     </option>
                   ))}
                 </select>
-                {formErrors.terem && <span className="error-text">{formErrors.terem}</span>}
+                {formErrors.terem && (
+                  <span className="error-text">{formErrors.terem}</span>
+                )}
               </div>
               <div className="form-field">
                 <label htmlFor="status">Státusz</label>
                 <select
                   id="status"
-                  value={formData.aktiv ? 'active' : 'inactive'}
+                  value={formData.aktiv ? "active" : "inactive"}
                   onChange={(event) =>
-                    setFormData((prev) => ({ ...prev, aktiv: event.target.value === 'active' }))
+                    setFormData((prev) => ({
+                      ...prev,
+                      aktiv: event.target.value === "active",
+                    }))
                   }
                   disabled={isSubmitting}
                 >
@@ -256,15 +285,23 @@ export default function RaspberryDevices() {
                 </select>
               </div>
               <div className="modal-actions">
-                <button type="button" className="modal-secondary" onClick={closeModal}>
+                <button
+                  type="button"
+                  className="modal-secondary"
+                  onClick={closeModal}
+                >
                   Mégse
                 </button>
                 <button
                   type="submit"
                   className="modal-primary"
-                  disabled={isSubmitting || isRoomsLoading || availableRooms.length === 0}
+                  disabled={
+                    isSubmitting ||
+                    isRoomsLoading ||
+                    availableRooms.length === 0
+                  }
                 >
-                  {isSubmitting ? 'Mentés...' : 'Mentés'}
+                  {isSubmitting ? "Mentés..." : "Mentés"}
                 </button>
               </div>
             </form>
