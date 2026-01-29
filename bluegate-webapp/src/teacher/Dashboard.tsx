@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSupabaseSession } from '../hooks/useSupabaseSession';
 import { supabase } from '../lib/supabase';
 import './Dashboard.css';
@@ -10,6 +11,7 @@ interface Course {
 
 export default function TeacherDashboard() {
   const { userProfile } = useSupabaseSession();
+  const navigate = useNavigate();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -93,6 +95,7 @@ export default function TeacherDashboard() {
     fetchCourses();
   }, [userProfile?.id]);
 
+
   return (
     <div className="dashboard-container">
       <div className="dashboard-header">
@@ -134,7 +137,7 @@ export default function TeacherDashboard() {
             <div 
               key={course.id} 
               className="course-card"
-              onClick={() => console.log('Tantárgy kattintva:', course.nev)}
+              onClick={() => navigate(`/teacher/course/${course.id}`)}
             >
               <h2>{course.nev}</h2>
               <p className="course-subtitle">Kattints a részletekért</p>

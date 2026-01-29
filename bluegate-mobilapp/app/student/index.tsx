@@ -157,10 +157,8 @@ export default function StudentIndex() {
       // Fallback: show info
       Alert.alert(
         'Bluetooth nem elérhető',
-        `BLE Advertiser nem elérhető.\n\nSugárzandó adatok:\n- Service UUID: ${SERVICE_UUID}\n- Azonosító: ${studentIdentifier}`,
-        [
-          { text: 'OK', style: 'cancel' },
-        ]
+        'BLE Advertiser nem elérhető. Kérjük, ellenőrizd a Bluetooth beállításokat, majd próbáld újra.',
+        [{ text: 'OK', style: 'cancel' }]
       );
       return;
     }
@@ -184,11 +182,9 @@ export default function StudentIndex() {
       const result = await BleAdvertiser.startAdvertising(SERVICE_UUID, studentIdentifier);
       
       console.log('BLE Advertising started:', result);
-      console.log('Service UUID:', SERVICE_UUID);
-      console.log('Student Identifier:', studentIdentifier);
       
       setIsAdvertising(true);
-      setStatusMessage(`Sugárzás aktív\nService: ${SERVICE_UUID}\nAzonosító: ${studentIdentifier}`);
+      setStatusMessage('Sugárzás aktív');
 
       advertisingTimeoutRef.current = setTimeout(() => {
         if (!hasAttendanceConfirmationRef.current) {
@@ -208,7 +204,7 @@ export default function StudentIndex() {
       
       Alert.alert(
         'Sugárzás elindítva',
-        `A telefon most sugározza az adatokat:\n\n• Service UUID:\n${SERVICE_UUID}\n\n• Azonosító:\n${studentIdentifier}`,
+        'A telefon most sugározza a jelenléti azonosítót.',
         [{ text: 'OK' }]
       );
 
@@ -242,7 +238,7 @@ export default function StudentIndex() {
       // Ask user if they want to start advertising
       Alert.alert(
         'Bluetooth sugárzás',
-        `Szeretné elindítani a Bluetooth sugárzást?\n\nSugárzandó adatok:\n• Service UUID: ${SERVICE_UUID}\n• Azonosító: ${studentIdentifier}`,
+        'Szeretnéd elindítani a Bluetooth sugárzást?',
         [
           { text: 'Nem', style: 'cancel' },
           { text: 'Igen', onPress: startAdvertising },
@@ -366,8 +362,7 @@ export default function StudentIndex() {
 
         {studentIdentifier ? (
           <ThemedView style={styles.infoBox}>
-            <ThemedText style={styles.infoLabel}>Sugárzandó azonosító:</ThemedText>
-            <ThemedText style={styles.infoValue}>{studentIdentifier}</ThemedText>
+            <ThemedText style={styles.infoLabel}>Bluetooth sugárzás aktív állapotban azonosít.</ThemedText>
           </ThemedView>
         ) : null}
       </ThemedView>
