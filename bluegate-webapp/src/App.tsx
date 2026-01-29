@@ -10,10 +10,19 @@ import AddTeacher from './admin/AddTeacher'
 import EditTeacher from './admin/EditTeacher'
 import RaspberryDevices from './admin/RaspberryDevices'
 import TeacherDashboard from './teacher/Dashboard'
+import CourseAttendance from './teacher/CourseAttendance'
 import { SupabaseAuthProvider, useSupabaseSession } from './hooks/useSupabaseSession'
 
 function Header() {
   const { userProfile, signOut } = useSupabaseSession()
+  const [isNavOpen, setIsNavOpen] = useState(false)
+
+  useEffect(() => {
+    document.body.classList.add('has-header')
+    return () => {
+      document.body.classList.remove('has-header')
+    }
+  }, [])
 
   const getNavItems = () => {
     if (!userProfile) {
@@ -45,17 +54,34 @@ function Header() {
     <header className="app-header">
       <div className="app-header-left">
         {navItems.length > 0 && (
-          <nav className="header-nav" aria-label="Fő navigáció">
-            {navItems.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) => `header-nav-link${isActive ? ' active' : ''}`}
-              >
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
+          <>
+            <button
+              type="button"
+              className="nav-toggle"
+              aria-expanded={isNavOpen}
+              aria-controls="header-nav"
+              onClick={() => setIsNavOpen((prev) => !prev)}
+            >
+              Menü
+              <span className="nav-toggle-icon" aria-hidden="true">☰</span>
+            </button>
+            <nav
+              id="header-nav"
+              className={`header-nav${isNavOpen ? ' is-open' : ''}`}
+              aria-label="Fő navigáció"
+            >
+              {navItems.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  onClick={() => setIsNavOpen(false)}
+                  className={({ isActive }) => `header-nav-link${isActive ? ' active' : ''}`}
+                >
+                  {item.label}
+                </NavLink>
+              ))}
+            </nav>
+          </>
         )}
       </div>
 
@@ -233,6 +259,7 @@ function App() {
           
           {/* Teacher only routes */}
           <Route path="/teacher/dashboard" element={<ProtectedRoute allowedRoles="teacher"><TeacherDashboard /></ProtectedRoute>} />
+          <Route path="/teacher/course/:courseId" element={<ProtectedRoute allowedRoles="teacher"><CourseAttendance /></ProtectedRoute>} />
           
           {/* Routes accessible by both admin and teacher */}
           {/* <Route path="/shared/page" element={<ProtectedRoute allowedRoles="all"><SharedPage /></ProtectedRoute>} /> */}
