@@ -1,0 +1,143 @@
+.attendance-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 5rem 2rem 4rem;
+  background-color: #0a1929;
+  min-height: 100vh;
+  color: #ffffff;
+}
+
+.attendance-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
+}
+
+.attendance-eyebrow {
+  margin: 0 0 0.35rem 0;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1rem;
+  color: #90caf9;
+}
+
+.attendance-header h1 {
+  margin: 0;
+  font-size: 2.1rem;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.back-button {
+  align-self: flex-start;
+  background: none;
+  border: 1px solid rgba(0, 217, 255, 0.35);
+  color: #90caf9;
+  padding: 0.5rem 0.9rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.back-button:hover {
+  border-color: #00d9ff;
+  color: #00d9ff;
+  background-color: rgba(0, 217, 255, 0.08);
+}
+
+.attendance-state {
+  padding: 2.5rem;
+  text-align: center;
+  color: #90caf9;
+  font-size: 1.05rem;
+}
+
+.attendance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.25rem;
+}
+
+.attendance-card {
+  background: linear-gradient(160deg, rgba(19, 47, 76, 0.95), rgba(14, 33, 54, 0.95));
+  border-radius: 16px;
+  border: 1px solid rgba(0, 217, 255, 0.2);
+  padding: 1.25rem;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.attendance-card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.attendance-card-header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #e3f2fd;
+  font-weight: 600;
+}
+
+.attendance-card-header span {
+  font-size: 0.85rem;
+  color: #90caf9;
+}
+
+.attendance-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.attendance-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.65rem;
+  border-radius: 10px;
+  background-color: rgba(10, 25, 41, 0.7);
+  border: 1px solid rgba(30, 58, 82, 0.6);
+}
+
+.attendance-name {
+  font-size: 0.9rem;
+  color: #d6ecff;
+  font-weight: 500;
+}
+
+.attendance-id {
+  font-size: 0.75rem;
+  color: #90caf9;
+  opacity: 0.8;
+}
+
+@media (max-width: 768px) {
+  .attendance-page {
+    padding: 4.5rem 1.25rem 3.5rem;
+  }
+
+  .attendance-header h1 {
+    font-size: 1.6rem;
+  }
+
+  .attendance-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .attendance-page {
+    padding: 4rem 1rem 3rem;
+  }
+
+  .attendance-card {
+    padding: 1rem;
+  }
+}
