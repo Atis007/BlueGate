@@ -1,5 +1,7 @@
 import os
 import json
+import sys
+import subprocess
 from flask import Flask, render_template_string, request, redirect, url_for, flash
 import httpx
 from dotenv import load_dotenv
@@ -13,6 +15,9 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
 SESSION_FILE = "current_session.json"
+ACCEPTED_STUDENTS_FILE = "accepted_students.json"
+SCAN_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scan.py")
+scan_process = None
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -33,16 +38,58 @@ HTML_TEMPLATE = """
             min-height: 100vh;
             display: flex;
             justify-content: center;
-            align-items: center;
+            align-items: stretch;
             padding: 20px;
+            gap: 24px;
         }
         .container {
             background: white;
             padding: 40px;
             border-radius: 16px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-            max-width: 500px;
+            max-width: 400px;
             width: 100%;
+            align-self: center;
+        }
+        .panel-right {
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            flex: 1;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+        }
+        .panel-right h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        .panel-right .students-list {
+            flex: 1;
+            max-height: none;
+        }
+        .students-list {
+            border: 1px solid #e6e6e6;
+            border-radius: 8px;
+            padding: 12px;
+            max-height: 360px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .student-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 10px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+        }
+        .student-item:last-child {
+            border-bottom: none;
+        }
+        .student-meta {
+            color: #666;
+            font-size: 12px;
         }
         h1 {
             color: #333;
@@ -128,10 +175,28 @@ HTML_TEMPLATE = """
             box-shadow: 0 5px 20px rgba(220, 53, 69, 0.4);
         }
     </style>
+    {% if active_course %}
+    <script>
+        setInterval(function() {
+            fetch('/api/students')
+                .then(response => response.json())
+                .then(data => {
+                    const list = document.getElementById('students-list');
+                    if (data.length === 0) {
+                        list.innerHTML = '<div class="student-meta">Még nincs elfogadott diák.</div>';
+                    } else {
+                        list.innerHTML = data.map(s => 
+                            '<div class="student-item"><span>' + s.index_number + '</span><span class="student-meta">' + s.timestamp + '</span></div>'
+                        ).join('');
+                    }
+                });
+        }, 2000);
+    </script>
+    {% endif %}
 </head>
 <body>
     <div class="container">
-        <h1>📚 Jelenléti Rendszer</h1>
+        <h1>Jelenléti Rendszer</h1>
         <p class="subtitle">Raspberry Pi BLE Scanner</p>
         
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -144,10 +209,10 @@ HTML_TEMPLATE = """
         
         {% if active_course %}
         <div class="current-session">
-            <strong>🟢 Aktív óra:</strong> {{ active_course }}
+            <strong>Aktív óra:</strong> {{ active_course }}
         </div>
         <form method="POST" action="{{ url_for('stop_class') }}">
-            <button type="submit" class="stop-btn">⏹ Óra befejezése</button>
+            <button type="submit" class="stop-btn">Óra befejezése</button>
         </form>
         {% else %}
         <form method="POST" action="{{ url_for('start_class') }}">
@@ -160,10 +225,27 @@ HTML_TEMPLATE = """
                     {% endfor %}
                 </select>
             </div>
-            <button type="submit">▶ Óra indítása</button>
+            <button type="submit">Óra indítása</button>
         </form>
         {% endif %}
     </div>
+    {% if active_course %}
+    <div class="panel-right">
+        <h3>Elfogadott diákok</h3>
+        <div class="students-list" id="students-list">
+            {% if accepted_students %}
+                {% for student in accepted_students %}
+                    <div class="student-item">
+                        <span>{{ student.index_number }}</span>
+                        <span class="student-meta">{{ student.timestamp }}</span>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="student-meta">Még nincs elfogadott diák.</div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 </body>
 </html>
 """
@@ -230,12 +312,67 @@ def clear_session():
         return False
 
 
+def get_accepted_students(active_course_id: int | None) -> list[dict]:
+    if not active_course_id:
+        return []
+    if not os.path.exists(ACCEPTED_STUDENTS_FILE):
+        return []
+    try:
+        with open(ACCEPTED_STUDENTS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if not isinstance(data, list):
+                return []
+            filtered = [s for s in data if s.get("course_id") == active_course_id]
+            filtered.sort(key=lambda x: x.get("timestamp", ""))
+            return filtered
+    except (json.JSONDecodeError, IOError) as e:
+        print(f"Accepted fájl olvasási hiba: {e}")
+        return []
+
+
+def start_scan_if_needed() -> tuple[bool, str]:
+    """Indítja a scan.py-t háttérben, ha még nem fut."""
+    global scan_process
+
+    if scan_process and scan_process.poll() is None:
+        return False, "A szkennelés már fut."
+
+    if not os.path.exists(SCAN_SCRIPT):
+        return False, "A scan.py nem található."
+
+    try:
+        scan_process = subprocess.Popen(
+            [sys.executable, SCAN_SCRIPT],
+            cwd=os.path.dirname(SCAN_SCRIPT),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.STDOUT,
+        )
+        return True, "Szkennelés elindítva."
+    except Exception as e:
+        return False, f"Szkennelés indítási hiba: {e}"
+
+
+@app.route("/api/students")
+def api_students():
+    session = get_active_session()
+    active_course_id = session[0] if session else None
+    students = get_accepted_students(active_course_id)
+    return students
+
+
 @app.route("/")
 def index():
     courses = get_courses()
     session = get_active_session()
     active_course = session[1] if session else None
-    return render_template_string(HTML_TEMPLATE, courses=courses, active_course=active_course)
+    active_course_id = session[0] if session else None
+    accepted_students = get_accepted_students(active_course_id)
+    return render_template_string(
+        HTML_TEMPLATE,
+        courses=courses,
+        active_course=active_course,
+        accepted_students=accepted_students,
+    )
 
 
 @app.route("/start", methods=["POST"])
@@ -251,6 +388,11 @@ def start_class():
     
     if save_session(int(course_id), course_name):
         flash(f"✅ Óra elindítva: {course_name}", "success")
+        started, message = start_scan_if_needed()
+        if started:
+            flash(f"{message}", "success")
+        else:
+            flash(f"{message}", "error")
     else:
         flash("❌ Hiba történt az óra indításakor!", "error")
     
@@ -259,10 +401,26 @@ def start_class():
 
 @app.route("/stop", methods=["POST"])
 def stop_class():
+    global scan_process
+    
+    # Stop the scan process if running
+    if scan_process and scan_process.poll() is None:
+        scan_process.terminate()
+        try:
+            scan_process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            scan_process.kill()
+        scan_process = None
+    
     if clear_session():
-        flash("✅ Óra sikeresen befejezve!", "success")
+        if os.path.exists(ACCEPTED_STUDENTS_FILE):
+            try:
+                os.remove(ACCEPTED_STUDENTS_FILE)
+            except Exception as e:
+                print(f"Accepted fájl törlési hiba: {e}")
+        flash("Óra sikeresen befejezve!", "success")
     else:
-        flash("❌ Hiba történt az óra befejezésekor!", "error")
+        flash("Hiba történt az óra befejezésekor!", "error")
     return redirect(url_for("index"))
 
 

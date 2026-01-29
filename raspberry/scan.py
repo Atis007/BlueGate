@@ -8,12 +8,16 @@ import datetime
 import glob
 import threading
 import random
+from zoneinfo import ZoneInfo
 
 import httpx
 from dotenv import load_dotenv
 from bleak import BleakScanner
 
 from config import APP_SERVICE_UUID, RSSI_THRESHOLD, SCAN_INTERVAL
+
+# Serbian timezone
+SERBIAN_TZ = ZoneInfo("Europe/Belgrade")
 
 # .env fájl betöltése
 load_dotenv()
@@ -37,6 +41,7 @@ INDEX_NUMBER_REGEX = re.compile(r"^[0-9]{8}$")
 
 # Session fájl elérési útja
 SESSION_FILE = "current_session.json"
+ACCEPTED_STUDENTS_FILE = "accepted_students.json"
 
 def fetch_raspberry_device_ids() -> list[int]:
     """# Lekéri az összes ID-t a public.raspberry_devices táblából."""
@@ -81,6 +86,51 @@ def get_active_course_id() -> int | None:
     except (json.JSONDecodeError, IOError, KeyError) as e:
         print(f"[WARN] Session fájl olvasási hiba: {e}")
         return None
+
+
+def load_accepted_students() -> list[dict]:
+    if not os.path.exists(ACCEPTED_STUDENTS_FILE):
+        return []
+    try:
+        with open(ACCEPTED_STUDENTS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, list):
+                return data
+            return []
+    except (json.JSONDecodeError, IOError) as e:
+        print(f"[WARN] Accepted fájl olvasási hiba: {e}")
+        return []
+
+
+def save_accepted_students(students: list[dict]) -> None:
+    temp_file = ACCEPTED_STUDENTS_FILE + ".tmp"
+    try:
+        with open(temp_file, "w", encoding="utf-8") as f:
+            json.dump(students, f, ensure_ascii=False)
+        os.replace(temp_file, ACCEPTED_STUDENTS_FILE)
+    except Exception as e:
+        print(f"[WARN] Accepted fájl mentési hiba: {e}")
+
+
+def log_accepted_student(index_number: str, rssi: int) -> None:
+    course_id = get_active_course_id()
+    if course_id is None:
+        return
+
+    students = load_accepted_students()
+
+    if any(s.get("index_number") == index_number and s.get("course_id") == course_id for s in students):
+        return
+
+    students.append(
+        {
+            "index_number": index_number,
+            "course_id": course_id,
+            "rssi": rssi,
+            "timestamp": datetime.datetime.now(SERBIAN_TZ).strftime("%Y-%m-%d %H:%M:%S"),
+        }
+    )
+    save_accepted_students(students)
 
 
 def get_student_id_by_indexszam(indexszam: str) -> int | None:
@@ -365,7 +415,7 @@ def insert_attendance(student_indexszam: str, rssi: int) -> None:
     payload = {
         "course_id": course_id,
         "diak_id": diak_id,
-        "datum": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "datum": datetime.datetime.now(SERBIAN_TZ).strftime("%Y-%m-%d %H:%M:%S")
     }
 
     try:
@@ -450,6 +500,7 @@ def detection_callback(device, advertisement_data):
 
     print(f"[OK] Felismert diák: {index_number} (RSSI={rssi})")
 
+    log_accepted_student(index_number, rssi)
     insert_attendance(index_number, rssi)
     print()
 
