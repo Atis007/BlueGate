@@ -482,28 +482,28 @@ export default function Teachers() {
                         )}
                       </div>
 
-                      <button
-                        type="button"
-                        className="mini-button"
-                        onClick={() => handleAddSelectedSubjectsToTeacher(teacher.id)}
-                        disabled={subjects.length === 0 || (selectedSubjectIds[teacher.id] ?? []).length === 0 || Boolean(isUpdatingTeacherSubjects[teacher.id])}
-                        title="Hozzáadás"
-                      >
-                        +
-                      </button>
-                      <button
-                        type="button"
-                        className="mini-button danger"
-                        onClick={() => handleRemoveSelectedSubjectsFromTeacher(teacher.id)}
-                        disabled={
-                          (teacherSubjects[teacher.id] ?? []).length === 0 ||
-                          (selectedSubjectIds[teacher.id] ?? []).length === 0 ||
-                          Boolean(isUpdatingTeacherSubjects[teacher.id])
-                        }
-                        title="Eltávolítás"
-                      >
-                        -
-                      </button>
+                      {(selectedSubjectIds[teacher.id] ?? []).length > 0 && (
+                        <>
+                          <button
+                            type="button"
+                            className="mini-button"
+                            onClick={() => handleAddSelectedSubjectsToTeacher(teacher.id)}
+                            disabled={subjects.length === 0 || Boolean(isUpdatingTeacherSubjects[teacher.id])}
+                            title="Hozzáadás"
+                          >
+                            +
+                          </button>
+                          <button
+                            type="button"
+                            className="mini-button danger"
+                            onClick={() => handleRemoveSelectedSubjectsFromTeacher(teacher.id)}
+                            disabled={(teacherSubjects[teacher.id] ?? []).length === 0 || Boolean(isUpdatingTeacherSubjects[teacher.id])}
+                            title="Eltávolítás"
+                          >
+                            -
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>

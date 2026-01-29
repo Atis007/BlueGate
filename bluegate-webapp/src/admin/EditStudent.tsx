@@ -64,6 +64,8 @@ export default function EditStudent() {
 
     if (!formData.indexszam.trim()) {
       newErrors.indexszam = 'Az index szám megadása kötelező';
+    } else if (!/^\d{8}$/.test(formData.indexszam)) {
+      newErrors.indexszam = 'Az index számnak pontosan 8 számjegyből kell állnia';
     }
 
     // Password is optional when editing - only validate if provided
@@ -174,7 +176,10 @@ export default function EditStudent() {
             className={errors.indexszam ? 'input-error' : ''}
             placeholder="Adja meg az index számot"
             value={formData.indexszam}
-            onChange={(e) => updateField('indexszam', e.target.value.toUpperCase())}
+            onChange={(e) => updateField('indexszam', e.target.value.replace(/\D/g, '').slice(0, 8))}
+            inputMode="numeric"
+            pattern="\d{8}"
+            maxLength={8}
             disabled={isSubmitting}
           />
           {errors.indexszam && <span className="error-text">{errors.indexszam}</span>}
