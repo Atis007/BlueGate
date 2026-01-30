@@ -45,20 +45,20 @@ ACCEPTED_STUDENTS_FILE = "accepted_students.json"
 
 def fetch_raspberry_device_ids() -> list[int]:
     """# Lekéri az összes ID-t a public.raspberry_devices táblából."""
-    url = f"{SUPABASE_URL}/rest/v1/raspberry_devices"  # Meghívjuk a táblát
+    url = f"{SUPABASE_URL}/rest/v1/raspberry_devices"
     headers = {
-        "apikey": SUPABASE_KEY,                      # Supabase kulcs beállítása
-        "Authorization": f"Bearer {SUPABASE_KEY}"    # Auth header küldése
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}"
     }
-    params = {"select": "id"}                        # Csak az ID-kat kérjük
+    params = {"select": "id"}
     try:
-        resp = httpx.get(url, headers=headers, params=params, timeout=10)  # GET kérés küldése
-        resp.raise_for_status()                      # Hibát dob, ha nem 2xx
-        data = resp.json()                           # JSON válasz feldolgozása
-        return [row["id"] for row in data]           # ID-k listájának visszaadása
+        resp = httpx.get(url, headers=headers, params=params, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        return [row["id"] for row in data]
     except Exception as e:
-        print(f"[ERROR] raspberry_devices ID-k lekérése sikertelen: {e}")  # Hiba logolása
-        return []  
+        print(f"[ERROR] raspberry_devices ID-k lekérése sikertelen: {e}")
+        return []
 
 RASPBERRY_DEVICE_RANDOM_ID = None
 ids = fetch_raspberry_device_ids()
@@ -112,15 +112,23 @@ def save_accepted_students(students: list[dict]) -> None:
         print(f"[WARN] Accepted fájl mentési hiba: {e}")
 
 
-def log_accepted_student(index_number: str, rssi: int) -> None:
+def log_accepted_student(index_number: str, rssi: int) -> bool:
+    """
+    Helyi JSON fájlba menti a diákot, ha még nincs benne.
+    Return: 
+        True: ha sikeresen hozzáadtuk (új diák).
+        False: ha már benne volt a listában.
+    """
     course_id = get_active_course_id()
     if course_id is None:
-        return
+        return False
 
     students = load_accepted_students()
 
+    # Itt történik a helyi ellenőrzés!
+    # Ha az indexszám és a course_id már szerepel a JSON-ben, akkor visszautasítjuk.
     if any(s.get("index_number") == index_number and s.get("course_id") == course_id for s in students):
-        return
+        return False
 
     students.append(
         {
@@ -131,6 +139,7 @@ def log_accepted_student(index_number: str, rssi: int) -> None:
         }
     )
     save_accepted_students(students)
+    return True
 
 
 def get_student_id_by_indexszam(indexszam: str) -> int | None:
@@ -159,34 +168,6 @@ def get_student_id_by_indexszam(indexszam: str) -> int | None:
         print(f"[ERROR] Diák ID lekérési hiba: {e}")
         return None
 
-
-def attendance_exists(diak_id: int, course_id: int) -> bool:
-    """
-    Ellenőrzi, hogy a diák már rögzítve van-e erre az órára.
-    """
-    url = f"{SUPABASE_URL}/rest/v1/attendance"
-    headers = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}"
-    }
-    params = {
-        "diak_id": f"eq.{diak_id}",
-        "course_id": f"eq.{course_id}",
-        "select": "id",
-        "limit": 1
-    }
-    
-    try:
-        r = httpx.get(url, headers=headers, params=params, timeout=10)
-        if r.status_code == 200:
-            data = r.json()
-            return len(data) > 0
-        return False
-    except Exception as e:
-        print(f"[ERROR] Jelenlét ellenőrzési hiba: {e}")
-        return False
-
-
 # ============================================
 # Offline mentés és későbbi szinkron logika
 # ============================================
@@ -198,14 +179,10 @@ is_syncing = False
 def save_offline_attendance(data: dict) -> None:
     """
     Jelenlét mentése helyi JSON fájlba későbbi szinkronhoz.
-    Fájlnév formátum: 
-    -raspberry: év_hónap_nap_óra:perc:másodperc.json
-    -windows: év_hónap_nap_óra-perc-másodperc.json
     """
     if not os.path.exists(OFFLINE_FOLDER):
         os.makedirs(OFFLINE_FOLDER)
 
-    # Formátum: év_hónap_nap_óra:perc:másodperc
     now = datetime.datetime.now()
     if platform.system() == "Windows":
         timestamp = now.strftime("%Y_%m_%d_%H-%M-%S")
@@ -215,7 +192,6 @@ def save_offline_attendance(data: dict) -> None:
     base_filename = f"{timestamp}.json"
     filepath = os.path.join(OFFLINE_FOLDER, base_filename)
 
-    # Ha a fájl már létezik (azonos másodperc), számlálóval tesszük egyedivé
     counter = 1
     while os.path.exists(filepath):
         timestamp_unique = f"{timestamp}_{counter}"
@@ -232,9 +208,6 @@ def save_offline_attendance(data: dict) -> None:
 
 
 def check_internet_connection() -> bool:
-    """
-    Internetkapcsolat ellenőrzése Supabase végpont elérésével.
-    """
     try:
         url = f"{SUPABASE_URL}/rest/v1/"
         headers = {
@@ -242,19 +215,38 @@ def check_internet_connection() -> bool:
             "Authorization": f"Bearer {SUPABASE_KEY}"
         }
         r = httpx.get(url, headers=headers, timeout=5)
-        return r.status_code in (200, 400, 404)  # Bármely válasz azt jelzi, hogy online vagyunk
+        return r.status_code in (200, 400, 404)
     except Exception:
         return False
 
 
+def log_sync_event() -> None:
+    if not RASPBERRY_DEVICE_RANDOM_ID:
+        return
+
+    url = f"{SUPABASE_URL}/rest/v1/sync_logs"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal"
+    }
+
+    payload = {
+        "raspberry_devices_id": int(RASPBERRY_DEVICE_RANDOM_ID)
+    }
+
+    try:
+        r = httpx.post(url, headers=headers, json=payload, timeout=5)
+        if r.status_code in (200, 201, 204):
+            print(f"[SYNC-LOG] Szinkronizáció naplózva (Device ID: {RASPBERRY_DEVICE_RANDOM_ID})")
+        else:
+            print(f"[SYNC-LOG] Hiba a naplózáskor: {r.status_code} - {r.text}")
+    except Exception as e:
+        print(f"[SYNC-LOG] Kivétel a naplózáskor: {e}")
+
+
 def sync_logic() -> None:
-    """
-    Offline fájlok feltöltése Supabase-be.
-    Háttérszálon fut.
-    - Csak sikeres feltöltés után töröl
-    - Hibánál a fájlt megtartja és a következővel folytatja
-    - Új adat új fájlt hoz létre a meglévőktől függetlenül
-    """
     global is_syncing
 
     if is_syncing:
@@ -263,7 +255,6 @@ def sync_logic() -> None:
     is_syncing = True
 
     try:
-        # Először ellenőrizzük az internetkapcsolatot
         if not check_internet_connection():
             print("[SYNC] Nincs internetkapcsolat, kihagyás...")
             return
@@ -302,38 +293,31 @@ def sync_logic() -> None:
                     print(f"[SYNC] Feltöltve és törölve: {filename}")
                     successful_uploads += 1
                 else:
-                    # Feltöltés sikertelen: a fájlt megtartjuk későbbi próbához
                     filename = os.path.basename(filepath)
-                    print(f"[SYNC] Hiba ({r.status_code}): {filename} - megtartva későbbi próbálkozáshoz")
+                    print(f"[SYNC] Hiba ({r.status_code}): {filename} - megtartva")
                     failed_uploads += 1
-                    # Folytatás a következő fájllal megszakítás nélkül
 
             except httpx.TimeoutException:
                 filename = os.path.basename(filepath)
-                print(f"[SYNC] Időtúllépés: {filename} - megtartva későbbi próbálkozáshoz")
+                print(f"[SYNC] Időtúllépés: {filename} - megtartva")
                 failed_uploads += 1
-                # Folytatás a következő fájllal
 
             except Exception as e:
                 filename = os.path.basename(filepath)
                 print(f"[SYNC] Szinkronizálási hiba: {filename} - {e}")
                 failed_uploads += 1
-                # Folytatás a következő fájllal
 
-        if successful_uploads > 0 or failed_uploads > 0:
-            print(f"[SYNC] Összesítés: {successful_uploads} sikeres, {failed_uploads} sikertelen")
+        if successful_uploads > 0:
+            print(f"[SYNC] Kész. Sikeres: {successful_uploads}, Hiba: {failed_uploads}")
+            log_sync_event()
+        elif failed_uploads > 0:
+            print(f"[SYNC] Minden feltöltés sikertelen volt.")
 
     finally:
         is_syncing = False
 
 
 def trigger_sync() -> bool:
-    """
-    Szinkron indítása háttérszálon, ha vannak offline fájlok.
-    Returns:
-        True: Ha talált fájlokat és elindította a szinkronizációt.
-        False: Ha üres volt az offline mappa.
-    """
     if not os.path.exists(OFFLINE_FOLDER):
         return False
 
@@ -342,19 +326,14 @@ def trigger_sync() -> bool:
 
     if files:
         print(f"[OFFLINE] {len(files)} fájl vár szinkronizálásra...")
-        # Daemon=True, hogy a főprogram leállásakor ez is leálljon
         sync_thread = threading.Thread(target=sync_logic, daemon=True)
         sync_thread.start()
-        return True  # Jelezzük, hogy volt mit szinkronizálni
+        return True
     
-    return False  # Letezett az 'offline' mappa, de üres volt
+    return False
 
 
 def check_offline_folder_on_startup() -> None:
-    """
-    Induláskor offline mappa ellenőrzése és állapot jelentése.
-    Ha vannak várakozó fájlok, megpróbálja szinkronizálni.
-    """
     if not os.path.exists(OFFLINE_FOLDER):
         print("[OFFLINE] Nincs offline mappa, létrehozás...")
         os.makedirs(OFFLINE_FOLDER)
@@ -367,7 +346,6 @@ def check_offline_folder_on_startup() -> None:
         print("[OFFLINE] Offline mappa üres, nincs szinkronizálni való.")
     else:
         print(f"[OFFLINE] {len(files)} fájl található az offline mappában.")
-        # Szinkron indításának kísérlete
         if trigger_sync():
             print("[STARTUP] Háttérszinkronizáció elindítva.")
 
@@ -415,8 +393,9 @@ def student_exists(index_number: str) -> bool:
 
 def insert_attendance(student_indexszam: str, rssi: int) -> None:
     """
-    Jelenlét beszúrása Supabase-be (Store and Forward támogatással)
-    Az alábbi mezőket használja: course_id, diak_id, datum
+    Jelenlét beszúrása Supabase-be.
+    KIVETTÜK A SUPABASE DUPLIKÁCIÓ ELLENŐRZÉST!
+    Csak a helyi JSON-re hagyatkozunk, amit a log_accepted_student kezel.
     """
     # 1. Aktív óra ellenőrzése
     course_id = get_active_course_id()
@@ -430,12 +409,11 @@ def insert_attendance(student_indexszam: str, rssi: int) -> None:
         print(f"  → [ERROR] Nem található diák ID az indexszámhoz: {student_indexszam}")
         return
 
-    # 3. Ellenőrizzük, hogy már rögzítve van-e erre az órára
-    if attendance_exists(diak_id, course_id):
-        print(f"  → [INFO] Diák már rögzítve erre az órára: {student_indexszam}")
-        return
+    # KIVETTÜK: attendance_exists ellenőrzés
+    # Mivel a lokális tömb (log_accepted_student) már szűrte a duplikációt,
+    # itt már bátran beszúrhatjuk az adatot.
 
-    # 4. Payload összeállítása a pontos sémával
+    # 4. Payload összeállítása
     url = f"{SUPABASE_URL}/rest/v1/attendance"
     headers = {
         "apikey": SUPABASE_KEY,
@@ -455,7 +433,6 @@ def insert_attendance(student_indexszam: str, rssi: int) -> None:
 
         if r.status_code in (200, 201, 204):
             print(f"  → Mentve Supabase-be: diák={student_indexszam}, óra={course_id}")
-            # Szinkron meghivasa, és automatikus logolas történik a háttérben, ha van mit feltölteni.
             was_sync_triggered = trigger_sync()
             if was_sync_triggered:
                 print("  → [INFO] Offline adatok találhatók, szinkronizáció elindítva...")
@@ -470,9 +447,6 @@ def insert_attendance(student_indexszam: str, rssi: int) -> None:
 
 
 def extract_student_id(device, advertisement_data):
-    """
-    Indexszám kinyerése a device névből vagy a service data-ból
-    """
     if device.name:
         if device.name.isdigit() and len(device.name) == 8:
             return device.name
@@ -492,10 +466,6 @@ def extract_student_id(device, advertisement_data):
 
 
 def detection_callback(device, advertisement_data):
-    """
-    BLE callback — csökkentett log:
-    - csak app UUID + studentID esetén ír ki
-    """
     global processed_macs, found_students
 
     rssi = getattr(advertisement_data, "rssi", None)
@@ -516,7 +486,7 @@ def detection_callback(device, advertisement_data):
         print("  → Hibás indexszám formátum.\n")
         return
 
-    # 2) Supabase ellenőrzés
+    # 2) Supabase ellenőrzés (Létező diák?)
     if not student_exists(index_number):
         print("  → Nincs ilyen diák Supabase-ben.\n")
         return
@@ -526,35 +496,37 @@ def detection_callback(device, advertisement_data):
         print(f"  → Gyenge jel ({rssi} < {RSSI_THRESHOLD})\n")
         return
 
-    # OK → Feldolgozható
+    # OK → Feldolgozható MAC
     processed_macs.add(device.address)
     found_students += 1
 
     print(f"[OK] Felismert diák: {index_number} (RSSI={rssi})")
 
-    log_accepted_student(index_number, rssi)
-    insert_attendance(index_number, rssi)
+    # LOGOLÁS ÉS MENTÉS LOGIKA
+    # Először megpróbáljuk beírni a helyi JSON-be (ez az aktuális óra listája).
+    # Ha True-t ad vissza, az azt jelenti, hogy még nem volt ezen az órán -> Mentjük az adatbázisba is.
+    # Ha False-t, akkor már volt ezen az órán -> Nem mentjük újra.
+    
+    if log_accepted_student(index_number, rssi):
+        insert_attendance(index_number, rssi)
+    else:
+        print(f"  → [INFO] Lokálisan már rögzítve ezen az órán: {index_number}")
+    
     print()
 
 
 def input_listener(stop_event, loop):
-    """
-    Külön szálon fut: figyeli, hogy a felhasználó beírja-e a 'q'-t.
-    """
     print(">>> Nyomj 'q'-t és ENTER-t a leállítás kéréséhez...")
     while True:
         user_input = input()
         if user_input.strip().lower() == 'q':
             print("[STOP] Leállítás kezdeményezése...")
-            # Jelezzük az aszinkron loopnak, hogy vége
             loop.call_soon_threadsafe(stop_event.set)
             break
 
 async def scan_once():
-    # Induláskor offline mappa ellenőrzése és szinkron indítása
     check_offline_folder_on_startup()
 
-    # Indulás előtt aktív óra ellenőrzése
     course_id = get_active_course_id()
     if course_id is None:
         print("=" * 50)
@@ -569,12 +541,9 @@ async def scan_once():
     print(f"Scan idő: {SCAN_INTERVAL} mp")
     print(f"Keresett Service UUID: {APP_SERVICE_UUID}\n")
 
-    # Esemény és Loop lekérése
     stop_event = asyncio.Event()
     loop = asyncio.get_running_loop()
 
-    # Input figyelő szál indítása
-    # Daemon=True, hogy a program kilépésekor ez is leálljon
     input_thread = threading.Thread(target=input_listener, args=(stop_event, loop), daemon=True)
     input_thread.start()
 
@@ -597,107 +566,6 @@ async def scan_once():
         print(f"Összesen {found_students} diákot felismertünk.")
 
     print("-----------------------------\n")
-
-def log_sync_event() -> None:
-    """
-    Sikeres szinkronizáció bejegyzése a sync_logs táblába.
-    """
-    # Ha nincs beállítva ID, nem tudunk mit logolni
-    if not RASPBERRY_DEVICE_RANDOM_ID:
-        return
-
-    url = f"{SUPABASE_URL}/rest/v1/sync_logs"
-    headers = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json",
-        "Prefer": "return=minimal"
-    }
-
-    # Csak a device ID-t küldjük, a 'synced_at' időbélyeget a Supabase 
-    # automatikusan hozzáadja (default now()).
-    payload = {
-        "raspberry_devices_id": int(RASPBERRY_DEVICE_RANDOM_ID)
-    }
-
-    try:
-        r = httpx.post(url, headers=headers, json=payload, timeout=5)
-        if r.status_code in (200, 201, 204):
-            print(f"[SYNC-LOG] Szinkronizáció naplózva (Device ID: {RASPBERRY_DEVICE_RANDOM_ID})")
-        else:
-            print(f"[SYNC-LOG] Hiba a naplózáskor: {r.status_code} - {r.text}")
-    except Exception as e:
-        print(f"[SYNC-LOG] Kivétel a naplózáskor: {e}")
-
-def sync_logic() -> None:
-    """
-    Offline fájlok feltöltése Supabase-be + Logolás a sync_logs táblába.
-    """
-    global is_syncing
-
-    if is_syncing:
-        return
-
-    is_syncing = True
-
-    try:
-        # Net ellenőrzés
-        if not check_internet_connection():
-            print("[SYNC] Nincs internetkapcsolat, kihagyás...")
-            return
-
-        pattern = os.path.join(OFFLINE_FOLDER, "*.json")
-        files = glob.glob(pattern)
-
-        if not files:
-            return
-
-        files.sort()
-
-        url = f"{SUPABASE_URL}/rest/v1/attendance"
-        headers = {
-            "apikey": SUPABASE_KEY,
-            "Authorization": f"Bearer {SUPABASE_KEY}",
-            "Content-Type": "application/json",
-            "Prefer": "return=minimal"
-        }
-
-        print(f"[SYNC] {len(files)} offline fájl szinkronizálása...")
-
-        successful_uploads = 0
-        failed_uploads = 0
-
-        for filepath in files:
-            try:
-                with open(filepath, "r", encoding="utf-8") as f:
-                    payload = json.load(f)
-
-                r = httpx.post(url, headers=headers, json=payload, timeout=10)
-
-                if r.status_code in (200, 201, 204):
-                    os.remove(filepath)
-                    filename = os.path.basename(filepath)
-                    print(f"[SYNC] Feltöltve és törölve: {filename}")
-                    successful_uploads += 1
-                else:
-                    filename = os.path.basename(filepath)
-                    print(f"[SYNC] Hiba ({r.status_code}): {filename} - megtartva")
-                    failed_uploads += 1
-
-            except Exception as e:
-                print(f"[SYNC] Hiba: {e}")
-                failed_uploads += 1
-
-        # LOGOLÁS: Ha volt legalább egy sikeres feltöltés, akkor írunk a sync_logs táblába!
-        if successful_uploads > 0:
-            print(f"[SYNC] Kész. Sikeres: {successful_uploads}, Hiba: {failed_uploads}")
-            # Itt hívjuk meg a logolást, mert itt tudjuk, hogy tényleg átment az adat
-            log_sync_event()
-        elif failed_uploads > 0:
-            print(f"[SYNC] Minden feltöltés sikertelen volt.")
-
-    finally:
-        is_syncing = False
 
 if __name__ == "__main__":
     asyncio.run(scan_once())
