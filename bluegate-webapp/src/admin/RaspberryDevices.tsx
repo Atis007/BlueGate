@@ -181,35 +181,37 @@ export default function RaspberryDevices() {
         </div>
       ) : (
         <div className="raspberry-table-container">
-          <div className="list-row list-header">
-            <div className="list-cell">ID</div>
-            <div className="list-cell">Terem</div>
-            <div className="list-cell">Státusz</div>
-          </div>
-
-          {devices.length === 0 ? (
-            <div
-              style={{ padding: "2rem", textAlign: "center", color: "#fff" }}
-            >
-              Nincsenek eszközök.
+          <div className="raspberry-table-scroll">
+            <div className="list-row list-header">
+              <div className="list-cell">ID</div>
+              <div className="list-cell">Terem</div>
+              <div className="list-cell">Státusz</div>
             </div>
-          ) : (
-            devices.map((device) => (
-              <div key={device.id} className="list-row">
-                <div className="list-cell">#{device.id}</div>
-                <div className="list-cell">{device.terem}</div>
-                <div className="list-cell">
-                  <span
-                    className={
-                      device.aktiv ? "status-active" : "status-inactive"
-                    }
-                  >
-                    {device.aktiv ? "Aktív" : "Inaktív"}
-                  </span>
-                </div>
+
+            {devices.length === 0 ? (
+              <div
+                style={{ padding: "2rem", textAlign: "center", color: "#fff" }}
+              >
+                Nincsenek eszközök.
               </div>
-            ))
-          )}
+            ) : (
+              devices.map((device) => (
+                <div key={device.id} className="list-row">
+                  <div className="list-cell">#{device.id}</div>
+                  <div className="list-cell">{device.terem}</div>
+                  <div className="list-cell">
+                    <span
+                      className={
+                        device.aktiv ? "status-active" : "status-inactive"
+                      }
+                    >
+                      {device.aktiv ? "Aktív" : "Inaktív"}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       )}
 

@@ -22,6 +22,8 @@ export default function AttendanceLogs() {
   const navigate = useNavigate();
   const [logs, setLogs] = useState<AttendanceLogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>(10);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     fetchLogs();
@@ -54,6 +56,28 @@ export default function AttendanceLogs() {
     }
   };
 
+  const totalItems = logs.length;
+  const totalPages = itemsPerPage === 'all' ? 1 : Math.ceil(totalItems / itemsPerPage);
+
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const displayedLogs = itemsPerPage === 'all'
+    ? logs
+    : logs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const handleItemsPerPageChange = (value: number | 'all') => {
+    setItemsPerPage(value);
+    setCurrentPage(1);
+  };
+
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
+
   return (
     <div className="students-container">
       <div className="students-header">
@@ -72,6 +96,26 @@ export default function AttendanceLogs() {
           <p>Betöltés...</p>
         </div>
       ) : (
+        <>
+        {logs.length > 0 && (
+          <div className="table-controls">
+            <div className="items-per-page">
+              <label>Megjelenítés:</label>
+              <select value={itemsPerPage} onChange={(e) => handleItemsPerPageChange(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}>
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value="all">Összes</option>
+              </select>
+              <span className="items-info">
+                {itemsPerPage === 'all'
+                  ? `Összes napló (${totalItems})`
+                  : `${(currentPage - 1) * itemsPerPage + 1}-${Math.min(currentPage * itemsPerPage, totalItems)} / ${totalItems}`
+                }
+              </span>
+            </div>
+          </div>
+        )}
         <div className="table-wrapper">
           <div className="list-container">
             <div
@@ -87,7 +131,7 @@ export default function AttendanceLogs() {
               <div className="list-cell">Dátum</div>
             </div>
             <div className="list-body">
-              {logs.map((log) => (
+              {displayedLogs.map((log) => (
                 <div
                   key={log.id}
                   className="list-row"
@@ -117,6 +161,55 @@ export default function AttendanceLogs() {
             </div>
           </div>
         </div>
+        {itemsPerPage !== 'all' && totalPages > 1 && (
+          <div className="pagination">
+            <button
+              className="pagination-button"
+              onClick={() => goToPage(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+              Előző
+            </button>
+
+            <div className="pagination-numbers">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                if (
+                  page === 1 ||
+                  page === totalPages ||
+                  (page >= currentPage - 1 && page <= currentPage + 1)
+                ) {
+                  return (
+                    <button
+                      key={page}
+                      className={`pagination-number ${page === currentPage ? 'active' : ''}`}
+                      onClick={() => goToPage(page)}
+                    >
+                      {page}
+                    </button>
+                  );
+                } else if (page === currentPage - 2 || page === currentPage + 2) {
+                  return <span key={page} className="pagination-ellipsis">...</span>;
+                }
+                return null;
+              })}
+            </div>
+
+            <button
+              className="pagination-button"
+              onClick={() => goToPage(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              Következő
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </button>
+          </div>
+        )}
+        </>
       )}
     </div>
   );

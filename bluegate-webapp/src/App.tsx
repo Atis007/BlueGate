@@ -12,6 +12,7 @@ import AttendanceLogs from './admin/AttendanceLogs'
 import Teachers from './admin/Teachers'
 import AddTeacher from './admin/AddTeacher'
 import EditTeacher from './admin/EditTeacher'
+import AddCourse from './admin/AddCourse'
 import TeacherDashboard from './teacher/Dashboard'
 import CourseAttendance from './teacher/CourseAttendance'
 import { SupabaseAuthProvider, useSupabaseSession } from './hooks/useSupabaseSession'
@@ -259,6 +260,7 @@ function App() {
           <Route path="/admin/teachers" element={<ProtectedRoute allowedRoles="admin"><Teachers /></ProtectedRoute>} />
           <Route path="/admin/add-teacher" element={<ProtectedRoute allowedRoles="admin"><AddTeacher /></ProtectedRoute>} />
           <Route path="/admin/edit-teacher/:id" element={<ProtectedRoute allowedRoles="admin"><EditTeacher /></ProtectedRoute>} />
+          <Route path="/admin/add-course" element={<ProtectedRoute allowedRoles="admin"><AddCourse /></ProtectedRoute>} />
           
           <Route path="/admin/logs" element={<ProtectedRoute allowedRoles="admin"><Logs /></ProtectedRoute>} />
           <Route path="/admin/sync-logs" element={<ProtectedRoute allowedRoles="admin"><SyncLogs /></ProtectedRoute>} />

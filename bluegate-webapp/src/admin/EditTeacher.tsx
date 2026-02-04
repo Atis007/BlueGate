@@ -13,6 +13,9 @@ export default function EditTeacher() {
   const [subjects, setSubjects] = useState<Array<{ id: number; nev: string }>>([]);
   const [selectedSubjectIds, setSelectedSubjectIds] = useState<number[]>([]);
   const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
+  const [subjectSearch, setSubjectSearch] = useState('');
+  const [assignedElsewhereIds, setAssignedElsewhereIds] = useState<number[]>([]);
+  const [initialAssignedSubjectIds, setInitialAssignedSubjectIds] = useState<number[]>([]);
   const [formData, setFormData] = useState({
     nev: '',
     email: '',
@@ -68,9 +71,14 @@ export default function EditTeacher() {
     setIsLoadingSubjects(true);
 
     try {
-      const [{ data: subjectsData, error: subjectsError }, { data: linksData, error: linksError }] = await Promise.all([
+      const [
+        { data: subjectsData, error: subjectsError },
+        { data: linksData, error: linksError },
+        { data: allLinksData, error: allLinksError },
+      ] = await Promise.all([
         supabase.from('courses').select('id, nev').order('nev', { ascending: true }),
         supabase.from('teacher_courses').select('course_id').eq('teacher_id', id),
+        supabase.from('teacher_courses').select('teacher_id, course_id'),
       ]);
 
       if (subjectsError) {
@@ -79,12 +87,21 @@ export default function EditTeacher() {
       if (linksError) {
         console.error('Hiba történt:', linksError);
       }
+      if (allLinksError) {
+        console.error('Hiba történt:', allLinksError);
+      }
 
       const loadedSubjects = (subjectsData as Array<{ id: number; nev: string }> | null) ?? [];
       setSubjects(loadedSubjects);
 
       const assigned = ((linksData as Array<{ course_id: number }> | null) ?? []).map((r) => r.course_id);
       setSelectedSubjectIds(assigned);
+      setInitialAssignedSubjectIds(assigned);
+
+      const assignedElsewhere = ((allLinksData as Array<{ teacher_id: string; course_id: number }> | null) ?? [])
+        .filter((row) => row.teacher_id !== id)
+        .map((row) => row.course_id);
+      setAssignedElsewhereIds(assignedElsewhere);
     } catch (error) {
       console.error('Hiba történt:', error);
     } finally {
@@ -94,6 +111,16 @@ export default function EditTeacher() {
 
   const toggleSubject = (subjectId: number) => {
     setSelectedSubjectIds((prev) => (prev.includes(subjectId) ? prev.filter((id) => id !== subjectId) : [...prev, subjectId]));
+  };
+
+  const handleSelectAllFiltered = (filtered: Array<{ id: number }>) => {
+    const ids = filtered.map((subject) => subject.id);
+    if (ids.length === 0) return;
+    setSelectedSubjectIds((prev) => Array.from(new Set([...prev, ...ids])));
+  };
+
+  const handleClearSelection = () => {
+    setSelectedSubjectIds([]);
   };
 
   const validateForm = () => {
@@ -221,6 +248,12 @@ export default function EditTeacher() {
     );
   }
 
+  const normalizedQuery = subjectSearch.trim().toLowerCase();
+  const availableSubjects = subjects.filter((subject) => !assignedElsewhereIds.includes(subject.id));
+  const filteredSubjects = normalizedQuery
+    ? availableSubjects.filter((subject) => subject.nev.toLowerCase().includes(normalizedQuery))
+    : availableSubjects;
+
   return (
     <div className="add-student-container">
       <div className="add-student-header">
@@ -296,24 +329,80 @@ export default function EditTeacher() {
         </div>
 
         <div className="form-group">
-          <label>Tantárgyak</label>
+          <div className="subjects-panel-header">
+            <label className="subjects-title">Tantárgyak</label>
+            <div className="subjects-meta">
+              Kijelölve: {selectedSubjectIds.length}/{subjects.length}
+            </div>
+          </div>
           {isLoadingSubjects ? (
             <div className="row-sub">Betöltés...</div>
           ) : subjects.length === 0 ? (
             <div className="row-sub">Nincs tantárgy a rendszerben.</div>
           ) : (
-            <div className="subject-checkboxes" role="group" aria-label="Tantárgy kiválasztás">
-              {subjects.map((subject) => (
-                <label key={subject.id} className="subject-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={selectedSubjectIds.includes(subject.id)}
-                    onChange={() => toggleSubject(subject.id)}
-                    disabled={isSubmitting}
-                  />
-                  <span>{subject.nev}</span>
-                </label>
-              ))}
+            <div className="subjects-panel">
+              <input
+                type="text"
+                className="subjects-search"
+                placeholder="Keresés tantárgyak között..."
+                value={subjectSearch}
+                onChange={(e) => setSubjectSearch(e.target.value)}
+                disabled={isSubmitting}
+              />
+              <div className="subjects-panel-actions">
+                <button
+                  type="button"
+                  className="subjects-panel-button"
+                  onClick={() => handleSelectAllFiltered(filteredSubjects)}
+                  disabled={isSubmitting || filteredSubjects.length === 0}
+                >
+                  Összes kijelölése
+                </button>
+                <button
+                  type="button"
+                  className="subjects-panel-button secondary"
+                  onClick={handleClearSelection}
+                  disabled={isSubmitting || selectedSubjectIds.length === 0}
+                >
+                  Kijelölés törlése
+                </button>
+              </div>
+              <div className="subjects-table" role="listbox" aria-label="Tantárgy kiválasztás">
+                <div className="subjects-row subjects-header" role="row">
+                  <div className="subjects-cell">Tantárgy</div>
+                </div>
+                {filteredSubjects.length === 0 ? (
+                  <div className="subjects-empty">Nincs találat.</div>
+                ) : (
+                  filteredSubjects.map((subject) => {
+                    const isSelected = selectedSubjectIds.includes(subject.id);
+                    const isAssigned = initialAssignedSubjectIds.includes(subject.id);
+                    return (
+                      <div
+                        key={subject.id}
+                        className={`subjects-row ${isSelected ? 'selected' : ''} ${isAssigned ? 'assigned' : ''}`}
+                        role="row"
+                        onClick={() => {
+                          if (!isSubmitting) {
+                            toggleSubject(subject.id);
+                          }
+                        }}
+                      >
+                        <div className="subjects-cell">
+                          <span className="subject-name">{subject.nev}</span>
+                        </div>
+                        <div className="subjects-cell subjects-cell-end">
+                          {isSelected && (
+                            <svg className="subjects-check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
           )}
         </div>
