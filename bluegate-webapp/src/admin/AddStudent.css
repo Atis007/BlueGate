@@ -186,6 +186,13 @@
   padding-left: 0.65rem;
 }
 
+.subjects-row.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.03);
+  border-left: 3px solid rgba(255, 255, 255, 0.2);
+}
+
 .subjects-header {
   background-color: rgba(0, 217, 255, 0.08);
   color: #bfefff;

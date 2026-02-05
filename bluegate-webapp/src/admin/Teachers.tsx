@@ -242,7 +242,7 @@ export default function Teachers() {
           </div>
         ) : (
           <>
-            <div className="list-table-wrapper">
+            <div className="list-table-wrapper teachers-table-wrapper">
               <div className="list-table teachers-table">
                 <div className="list-row list-header" role="row">
                   <div className="list-cell" role="columnheader">Név</div>
@@ -266,7 +266,15 @@ export default function Teachers() {
                       </button>
                       {subjects.length > 0 && (
                         <div className="subjects-tooltip" role="tooltip">
-                          {getSubjectsSummary(teacher.id).full || 'Nincs hozzárendelve tantárgy.'}
+                          {getSubjectNamesForTeacher(teacher.id).length > 0 ? (
+                            <ul className="subjects-tooltip-list">
+                              {getSubjectNamesForTeacher(teacher.id).map((name) => (
+                                <li key={name}>{name}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <span>Nincs hozzárendelve tantárgy.</span>
+                          )}
                         </div>
                       )}
                     </div>

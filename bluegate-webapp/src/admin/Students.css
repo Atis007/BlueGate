@@ -106,6 +106,10 @@
   -webkit-overflow-scrolling: touch;
 }
 
+.teachers-table {
+  overflow: visible;
+}
+
 .list-row {
   display: grid;
   grid-template-columns: minmax(180px, 2fr) minmax(140px, 1.5fr) auto;
@@ -232,6 +236,12 @@
   min-width: 0;
 }
 
+.subjects-hover {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
 .subjects-manage-button {
   padding: 0.35rem 0.6rem;
   border-radius: 8px;
@@ -254,18 +264,13 @@
   cursor: not-allowed;
 }
 
-.subjects-hover {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-
 .subjects-tooltip {
   position: absolute;
-  left: 0;
-  bottom: calc(100% + 8px);
-  min-width: 220px;
-  max-width: 320px;
+  right: calc(100% + 10px);
+  top: 50%;
+  min-width: 260px;
+  max-width: 520px;
+  max-height: 75vh;
   padding: 0.6rem 0.75rem;
   border-radius: 10px;
   border: 1px solid rgba(30, 58, 82, 0.8);
@@ -275,16 +280,35 @@
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
   opacity: 0;
   pointer-events: none;
-  transform: translateY(4px);
+  transform: translateY(-50%) translateX(-4px);
   transition: opacity 0.15s ease, transform 0.15s ease;
   white-space: normal;
+  overflow: auto;
   z-index: 20;
+}
+
+.subjects-tooltip-list {
+  margin: 0;
+  padding-left: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.subjects-tooltip-list li {
+  margin: 0;
+  line-height: 1.25;
 }
 
 .subjects-hover:hover .subjects-tooltip,
 .subjects-hover:focus-within .subjects-tooltip {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateY(-50%) translateX(0);
+}
+
+.teachers-table-wrapper {
+  max-height: none;
+  overflow: visible;
 }
 
 .subjects-values {

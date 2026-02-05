@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { hash } from 'bcryptjs';
 import { supabase } from '../lib/supabase';
@@ -15,6 +15,7 @@ export default function EditTeacher() {
   const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
   const [subjectSearch, setSubjectSearch] = useState('');
   const [assignedElsewhereIds, setAssignedElsewhereIds] = useState<number[]>([]);
+  const [assignedElsewhereMap, setAssignedElsewhereMap] = useState<Record<number, string>>({});
   const [initialAssignedSubjectIds, setInitialAssignedSubjectIds] = useState<number[]>([]);
   const [formData, setFormData] = useState({
     nev: '',
@@ -98,10 +99,15 @@ export default function EditTeacher() {
       setSelectedSubjectIds(assigned);
       setInitialAssignedSubjectIds(assigned);
 
-      const assignedElsewhere = ((allLinksData as Array<{ teacher_id: string; course_id: number }> | null) ?? [])
-        .filter((row) => row.teacher_id !== id)
-        .map((row) => row.course_id);
-      setAssignedElsewhereIds(assignedElsewhere);
+      const assignedElsewhereRows = ((allLinksData as Array<{ teacher_id: string; course_id: number }> | null) ?? [])
+        .filter((row) => row.teacher_id !== id);
+      const assignedElsewhere = assignedElsewhereRows.map((row) => row.course_id);
+      setAssignedElsewhereIds(Array.from(new Set(assignedElsewhere)));
+      const assignedMap: Record<number, string> = {};
+      assignedElsewhereRows.forEach((row) => {
+        assignedMap[row.course_id] = row.teacher_id;
+      });
+      setAssignedElsewhereMap(assignedMap);
     } catch (error) {
       console.error('Hiba történt:', error);
     } finally {
@@ -196,11 +202,10 @@ export default function EditTeacher() {
       const toRemove = existingIds.filter((subjectId) => !selectedSubjectIds.includes(subjectId));
 
       if (toRemove.length > 0) {
-        const { error: deleteError } = await supabase
-          .from('teacher_courses')
-          .delete()
-          .eq('teacher_id', id)
-          .in('course_id', toRemove);
+        const { error: deleteError } = await supabase.rpc('remove_teacher_courses', {
+          p_teacher_id: id,
+          p_course_ids: toRemove,
+        });
 
         if (deleteError) {
           console.error('Hiba történt:', deleteError);
@@ -231,6 +236,31 @@ export default function EditTeacher() {
     }
   };
 
+  const normalizedQuery = subjectSearch.trim().toLowerCase();
+  const filteredSubjects = normalizedQuery
+    ? subjects.filter((subject) => subject.nev.toLowerCase().includes(normalizedQuery))
+    : subjects;
+
+  const orderedSubjects = useMemo(() => {
+    const selectedSet = new Set(selectedSubjectIds);
+    const assignedElsewhereSet = new Set(assignedElsewhereIds);
+    return [...filteredSubjects].sort((a, b) => {
+      const aSelected = selectedSet.has(a.id);
+      const bSelected = selectedSet.has(b.id);
+      const aAssignedElsewhere = assignedElsewhereSet.has(a.id);
+      const bAssignedElsewhere = assignedElsewhereSet.has(b.id);
+
+      const aGroup = aSelected ? 0 : aAssignedElsewhere ? 2 : 1;
+      const bGroup = bSelected ? 0 : bAssignedElsewhere ? 2 : 1;
+
+      if (aGroup !== bGroup) {
+        return aGroup - bGroup;
+      }
+
+      return a.nev.localeCompare(b.nev, 'hu');
+    });
+  }, [filteredSubjects, selectedSubjectIds, assignedElsewhereIds]);
+
   if (isLoading) {
     return (
       <div className="add-student-container">
@@ -247,12 +277,6 @@ export default function EditTeacher() {
       </div>
     );
   }
-
-  const normalizedQuery = subjectSearch.trim().toLowerCase();
-  const availableSubjects = subjects.filter((subject) => !assignedElsewhereIds.includes(subject.id));
-  const filteredSubjects = normalizedQuery
-    ? availableSubjects.filter((subject) => subject.nev.toLowerCase().includes(normalizedQuery))
-    : availableSubjects;
 
   return (
     <div className="add-student-container">
@@ -371,22 +395,26 @@ export default function EditTeacher() {
                 <div className="subjects-row subjects-header" role="row">
                   <div className="subjects-cell">Tantárgy</div>
                 </div>
-                {filteredSubjects.length === 0 ? (
-                  <div className="subjects-empty">Nincs találat.</div>
+                {orderedSubjects.length === 0 ? (
+                  <div className="subjects-empty">
+                    Nincs találat.
+                  </div>
                 ) : (
-                  filteredSubjects.map((subject) => {
+                  orderedSubjects.map((subject) => {
                     const isSelected = selectedSubjectIds.includes(subject.id);
                     const isAssigned = initialAssignedSubjectIds.includes(subject.id);
+                    const isAssignedElsewhere = assignedElsewhereIds.includes(subject.id);
                     return (
                       <div
                         key={subject.id}
-                        className={`subjects-row ${isSelected ? 'selected' : ''} ${isAssigned ? 'assigned' : ''}`}
+                        className={`subjects-row ${isSelected ? 'selected' : ''} ${isAssigned ? 'assigned' : ''} ${isAssignedElsewhere ? 'disabled' : ''}`}
                         role="row"
                         onClick={() => {
-                          if (!isSubmitting) {
+                          if (!isSubmitting && !isAssignedElsewhere) {
                             toggleSubject(subject.id);
                           }
                         }}
+                        title={isAssignedElsewhere ? 'Már más tanárhoz van rendelve.' : undefined}
                       >
                         <div className="subjects-cell">
                           <span className="subject-name">{subject.nev}</span>
