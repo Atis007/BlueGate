@@ -29,6 +29,9 @@ export default function CourseAttendance() {
   const [attendanceCards, setAttendanceCards] = useState<AttendanceCard[]>([]);
   const [filterDate, setFilterDate] = useState('');
   const [activeDateFilter, setActiveDateFilter] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>(10);
+  const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -152,6 +155,38 @@ export default function CourseAttendance() {
     return attendanceCards.filter((card) => formatLocalDateKey(card.dateKey) === activeDateFilter);
   }, [attendanceCards, activeDateFilter]);
 
+  const sortedCards = useMemo(() => {
+    const direction = sortOrder === 'asc' ? 1 : -1;
+    return [...filteredCards].sort((a, b) => (new Date(a.dateKey).getTime() - new Date(b.dateKey).getTime()) * direction);
+  }, [filteredCards, sortOrder]);
+
+  const totalItems = sortedCards.length;
+  const totalPages = itemsPerPage === 'all' ? 1 : Math.ceil(totalItems / itemsPerPage);
+
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const displayedCards = itemsPerPage === 'all'
+    ? sortedCards
+    : sortedCards.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const handleItemsPerPageChange = (value: number | 'all') => {
+    setItemsPerPage(value);
+    setCurrentPage(1);
+  };
+
+  const handleSortOrderChange = (value: 'asc' | 'desc') => {
+    setSortOrder(value);
+    setCurrentPage(1);
+  };
+
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
+
   return (
     <div className="attendance-page">
       <div className="attendance-header">
@@ -177,6 +212,36 @@ export default function CourseAttendance() {
             onChange={(event) => setFilterDate(event.target.value)}
           />
         </div>
+        <div className="attendance-filter-group">
+          <label className="attendance-filter-label" htmlFor="attendance-sort-order">
+            Sorrend
+          </label>
+          <select
+            id="attendance-sort-order"
+            className="attendance-filter-input"
+            value={sortOrder}
+            onChange={(event) => handleSortOrderChange(event.target.value === 'asc' ? 'asc' : 'desc')}
+          >
+            <option value="desc">Dátum szerint csökkenő</option>
+            <option value="asc">Dátum szerint növekvő</option>
+          </select>
+        </div>
+        <div className="attendance-filter-group">
+          <label className="attendance-filter-label" htmlFor="attendance-items-per-page">
+            Megjelenítés
+          </label>
+          <select
+            id="attendance-items-per-page"
+            className="attendance-filter-input"
+            value={itemsPerPage}
+            onChange={(event) => handleItemsPerPageChange(event.target.value === 'all' ? 'all' : parseInt(event.target.value))}
+          >
+            <option value={5}>5</option>
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+            <option value="all">Összes</option>
+          </select>
+        </div>
         <button
           type="button"
           className="attendance-filter-button"
@@ -192,31 +257,81 @@ export default function CourseAttendance() {
         <div className="attendance-state">{errorMessage}</div>
       ) : attendanceCards.length === 0 ? (
         <div className="attendance-state">Nincs jelenléti adat ehhez a tantárgyhoz.</div>
-      ) : filteredCards.length === 0 ? (
+      ) : sortedCards.length === 0 ? (
         <div className="attendance-state">Nincs jelenléti adat a kiválasztott dátumra.</div>
       ) : (
-        <div className="attendance-grid">
-          {filteredCards.map((card) => (
-            <div key={card.dateKey} className="attendance-card">
-              <div className="attendance-card-header">
-                <h2>{card.label}</h2>
-                <span>{card.entries.length} jelenlét</span>
+        <>
+          <div className="attendance-grid">
+            {displayedCards.map((card) => (
+              <div key={card.dateKey} className="attendance-card">
+                <div className="attendance-card-header">
+                  <h2>{card.label}</h2>
+                  <span>{card.entries.length} jelenlét</span>
+                </div>
+                <div className="attendance-list">
+                  {card.entries.map((entry) => (
+                    <div key={entry.id} className="attendance-item">
+                      <span className="attendance-name">
+                        {entry.diak?.nev ?? `Diák #${entry.diak_id}`}
+                      </span>
+                      <span className="attendance-id">
+                        {entry.diak?.indexszam ?? ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="attendance-list">
-                {card.entries.map((entry) => (
-                  <div key={entry.id} className="attendance-item">
-                    <span className="attendance-name">
-                      {entry.diak?.nev ?? `Diák #${entry.diak_id}`}
-                    </span>
-                    <span className="attendance-id">
-                      {entry.diak?.indexszam ?? ''}
-                    </span>
-                  </div>
-                ))}
+            ))}
+          </div>
+          {itemsPerPage !== 'all' && totalPages > 1 && (
+            <div className="attendance-pagination">
+              <button
+                className="attendance-pagination-button"
+                onClick={() => goToPage(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+                Előző
+              </button>
+
+              <div className="attendance-pagination-numbers">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                  if (
+                    page === 1 ||
+                    page === totalPages ||
+                    (page >= currentPage - 1 && page <= currentPage + 1)
+                  ) {
+                    return (
+                      <button
+                        key={page}
+                        className={`attendance-pagination-number ${page === currentPage ? 'active' : ''}`}
+                        onClick={() => goToPage(page)}
+                      >
+                        {page}
+                      </button>
+                    );
+                  } else if (page === currentPage - 2 || page === currentPage + 2) {
+                    return <span key={page} className="attendance-pagination-ellipsis">...</span>;
+                  }
+                  return null;
+                })}
               </div>
+
+              <button
+                className="attendance-pagination-button"
+                onClick={() => goToPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+              >
+                Következő
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </button>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
     </div>
   );

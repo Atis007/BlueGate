@@ -52,6 +52,11 @@
   font-size: 0.95rem;
 }
 
+.attendance-filter-input option {
+  background-color: #0a1929;
+  color: #ffffff;
+}
+
 .attendance-filter-input:focus {
   outline: none;
   border-color: #00d9ff;
@@ -116,9 +121,76 @@
 }
 
 .attendance-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.attendance-pagination {
+  margin-top: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.attendance-pagination-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 217, 255, 0.3);
+  background: rgba(0, 217, 255, 0.12);
+  color: #bfefff;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.attendance-pagination-button:hover:not(:disabled) {
+  border-color: #00d9ff;
+  background: rgba(0, 217, 255, 0.22);
+}
+
+.attendance-pagination-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.attendance-pagination-numbers {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.attendance-pagination-number {
+  min-width: 34px;
+  padding: 0.4rem 0.6rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.attendance-pagination-number:hover {
+  border-color: rgba(0, 217, 255, 0.4);
+}
+
+.attendance-pagination-number.active {
+  border-color: #00d9ff;
+  color: #00d9ff;
+  background: rgba(0, 217, 255, 0.12);
+}
+
+.attendance-pagination-ellipsis {
+  color: #90caf9;
+  font-size: 0.85rem;
+  padding: 0 0.3rem;
 }
 
 .attendance-card {
